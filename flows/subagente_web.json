@@ -1,20 +1,6 @@
 {
-    "name": "DEV_GC_Especialista_Web",
+    "name": "DEV_GC_Especialista_Web_Handover",
     "nodes": [
-        {
-            "parameters": {
-                "amount": 2,
-                "unit": "seconds"
-            },
-            "id": "debounce-wait-web",
-            "name": "Debounce Wait",
-            "type": "n8n-nodes-base.wait",
-            "typeVersion": 1,
-            "position": [
-                100,
-                300
-            ]
-        },
         {
             "parameters": {
                 "model": "llama3-70b-8192",
@@ -27,21 +13,21 @@
             "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
             "typeVersion": 1,
             "position": [
-                350,
+                250,
                 450
             ],
             "credentials": {
                 "groqApi": {
-                    "id": "groq-api-credential-id"
+                    "id": "nfpxWh3Y5sUHefoj"
                 }
             }
         },
         {
             "parameters": {
                 "promptType": "define",
-                "text": "={{$json.mensaje_cliente}}",
+                "text": "={{$node[\"Execute Workflow Trigger\"].json[\"body\"]}}",
                 "options": {
-                    "systemMessage": "Eres el Especialista en Desarrollo Web. Tu objetivo es obtener: \n1. Stack preferido (ej: React, Vue, PHP).\n2. Presupuesto estimado.\n3. Tipo de sitio (E-commerce, Corporativo, etc.).\n\nResponde de manera profesional y haz la siguiente pregunta necesaria basándote en lo que ya sabes."
+                    "systemMessage": "={{ \"Eres el Especialista en Desarrollo Web. Tu objetivo es obtener: \\n1. Stack preferido (ej: React, Vue, PHP).\\n2. Presupuesto estimado.\\n3. Tipo de sitio (E-commerce, Corporativo, etc.).\\n\\nContexto actual: \" + JSON.stringify($node[\"Execute Workflow Trigger\"].json[\"context_data\"]) + \"\\n\\nResponde de manera profesional y haz la siguiente pregunta necesaria basándote en lo que ya sabes.\" }}"
                 }
             },
             "id": "ai-agent-web",
@@ -49,8 +35,8 @@
             "type": "@n8n/n8n-nodes-langchain.agent",
             "typeVersion": 1.6,
             "position": [
-                350,
-                300
+                250,
+                250
             ]
         },
         {
@@ -62,13 +48,47 @@
             "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
             "typeVersion": 1,
             "position": [
-                450,
+                400,
                 550
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "custom",
+                "customResourceId": "mail.channel",
+                "operation": "update",
+                "updateFields": {
+                    "message_post": "={{$json[\"output\"]}}"
+                }
+            },
+            "id": "odoo-response-web",
+            "name": "Odoo Final Response",
+            "type": "n8n-nodes-base.odoo",
+            "typeVersion": 1,
+            "position": [
+                550,
+                250
+            ],
+            "credentials": {
+                "odooApi": {
+                    "id": "xLBLBTpTONFN4DAO"
+                }
+            }
+        },
+        {
+            "parameters": {},
+            "id": "execute-trigger",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1,
+            "position": [
+                0,
+                250
             ]
         }
     ],
     "connections": {
-        "Debounce Wait": {
+        "Execute Workflow Trigger": {
             "main": [
                 [
                     {
@@ -100,9 +120,17 @@
                     }
                 ]
             ]
+        },
+        "IA Especialista Web": {
+            "main": [
+                [
+                    {
+                        "node": "odoo-response-web",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
-    },
-    "settings": {
-        "executionOrder": "v1"
     }
 }
