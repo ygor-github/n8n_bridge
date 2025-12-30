@@ -16,8 +16,11 @@ import json
 
 webhook_url = "https://n8n.erpelantar.com/webhook/odoo-livechat-v18-production"
 
-# Evitar bucles infinitos (no procesar mensajes que vienen de n8n si tienen un flag específico)
+# Evitar bucles infinitos
 if record.body and '&lt;span class="n8n-bot"&gt;' not in record.body:
+    # Buscar el estado del bridge para este canal
+    bridge_state = env['n8n.bridge.state'].search([('channel_id', '=', record.res_id)], limit=1)
+    
     payload = {
         "body": record.body,
         "author_id": record.author_id.id,
@@ -25,7 +28,10 @@ if record.body and '&lt;span class="n8n-bot"&gt;' not in record.body:
         "res_id": record.res_id,
         "res_model": record.model,
         "message_id": record.id,
+        "active_specialist": bridge_state.active_specialist_id if bridge_state else False,
+        "context_data": json.loads(bridge_state.context_data) if bridge_state and bridge_state.context_data else {},
     }
+    
     try:
         requests.post(webhook_url, json=payload, timeout=5)
     except Exception:
