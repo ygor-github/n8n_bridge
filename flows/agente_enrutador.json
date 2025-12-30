@@ -1,5 +1,5 @@
 {
-    "name": "DEV_GC_Agente_Enrutador_Odoo18_Handover",
+    "name": "DEV_GC_Agente_Enrutador_Odoo18_Handover_Final",
     "nodes": [
         {
             "parameters": {
@@ -65,14 +65,47 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.1,
             "position": [
-                650,
+                600,
                 150
             ]
         },
         {
             "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "body",
+                            "value": "={{$node[\"Odoo LiveChat Webhook\"].json[\"body\"]}}"
+                        },
+                        {
+                            "name": "res_id",
+                            "value": "={{$node[\"Odoo LiveChat Webhook\"].json[\"res_id\"]}}"
+                        },
+                        {
+                            "name": "active_specialist",
+                            "value": "={{$json[\"active_specialist\"] || $node[\"Actualizar Estado Odoo\"].json[\"result\"][\"active_specialist\"]}}"
+                        },
+                        {
+                            "name": "context_data",
+                            "value": "={{$node[\"Odoo LiveChat Webhook\"].json[\"context_data\"]}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "prepare-payload",
+            "name": "Preparar Datos Especialista",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.2,
+            "position": [
+                800,
+                300
+            ]
+        },
+        {
+            "parameters": {
                 "dataType": "string",
-                "value1": "={{$node[\"Tiene Especialista?\"].json[\"active_specialist\"] || $node[\"Actualizar Estado Odoo\"].json[\"result\"][\"active_specialist\"]}}",
+                "value1": "={{$json.active_specialist}}",
                 "rules": {
                     "rules": [
                         {
@@ -94,7 +127,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 1,
             "position": [
-                900,
+                1000,
                 300
             ]
         },
@@ -108,7 +141,7 @@
             "type": "n8n-nodes-base.executeWorkflow",
             "typeVersion": 1,
             "position": [
-                1150,
+                1250,
                 150
             ]
         },
@@ -122,7 +155,7 @@
             "type": "n8n-nodes-base.executeWorkflow",
             "typeVersion": 1,
             "position": [
-                1150,
+                1250,
                 300
             ]
         },
@@ -136,7 +169,7 @@
             "type": "n8n-nodes-base.executeWorkflow",
             "typeVersion": 1,
             "position": [
-                1150,
+                1250,
                 450
             ]
         },
@@ -183,7 +216,7 @@
                 ],
                 [
                     {
-                        "node": "Router de Especialistas",
+                        "node": "prepare-payload",
                         "type": "main",
                         "index": 0
                     }
@@ -205,14 +238,25 @@
             "main": [
                 [
                     {
-                        "node": "Router de Especialistas",
+                        "node": "prepare-payload",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Router de Especialistas": {
+        "prepare-payload": {
+            "main": [
+                [
+                    {
+                        "node": "specialist-router",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "specialist-router": {
             "main": [
                 [
                     {
