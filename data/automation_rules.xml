@@ -1,42 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
-        <!-- Regla de Automatización para enviar mensajes a n8n -->
-        <record id="rule_send_to_n8n" model="base.automation">
-            <name>Bridge n8n: Enviar Mensajes LiveChat</name>
-            <model_id ref="mail.model_mail_message"/>
-            <state>code</state>
-            <trigger>on_create</trigger>
-            <!-- Solo si es un canal de chat y no es un bot/system -->
-            <filter_pre_domain>[('model', '=', 'discuss.channel'), ('author_id', '!=', False)]</filter_pre_domain>
-            <code_python>
-# Lógica para disparar el webhook
-import requests
-import json
+    <!-- Acción de Servidor que ejecuta el código Python -->
+    <record id="action_send_to_n8n" model="ir.actions.server">
+        <field name="name">Bridge n8n: Ejecutar Webhook</field>
+        <field name="model_id" ref="mail.model_mail_message"/>
+        <field name="state">code</field>
+        <field name="code">record._notify_n8n()</field>
+    </record>
 
-webhook_url = "https://n8n.erpelantar.com/webhook/odoo-livechat-v18-production"
-
-# Evitar bucles infinitos
-if record.body and '&lt;span class="n8n-bot"&gt;' not in record.body:
-    # Buscar el estado del bridge para este canal
-    bridge_state = env['n8n.bridge.state'].search([('channel_id', '=', record.res_id)], limit=1)
-    
-    payload = {
-        "body": record.body,
-        "author_id": record.author_id.id,
-        "author_name": record.author_id.name,
-        "res_id": record.res_id,
-        "res_model": record.model,
-        "message_id": record.id,
-        "active_specialist": bridge_state.active_specialist_id if bridge_state else False,
-        "context_data": json.loads(bridge_state.context_data) if bridge_state and bridge_state.context_data else {},
-    }
-    
-    try:
-        requests.post(webhook_url, json=payload, timeout=5)
-    except Exception:
-        pass
-            </code_python>
-        </record>
-    </data>
+    <!-- Regla de Automatización que dispara la acción -->
+    <record id="rule_send_to_n8n" model="base.automation">
+        <field name="name">Bridge n8n: Enviar Mensajes LiveChat</field>
+        <field name="model_id" ref="mail.model_mail_message"/>
+        <field name="trigger">on_create</field>
+        <field name="action_server_ids" eval="[(4, ref('action_send_to_n8n'))]"/>
+    </record>
 </odoo>

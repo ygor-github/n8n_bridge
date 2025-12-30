@@ -10,6 +10,7 @@
     'author': 'Elantar Ltd.',
     'depends': ['base', 'mail', 'im_livechat', 'base_automation'],
     'data': [
+        'data/n8n_bot_user.xml',
         'data/automation_rules.xml',
     ],
     'installable': True,
