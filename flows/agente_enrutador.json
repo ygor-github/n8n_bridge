@@ -1,5 +1,5 @@
 {
-    "name": "DEV_GC_Agente_Enrutador",
+    "name": "DEV_GC_Agente_Enrutador_Odoo18_Handover",
     "nodes": [
         {
             "parameters": {
@@ -12,49 +12,34 @@
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1,
             "position": [
-                100,
+                0,
                 300
             ]
         },
         {
             "parameters": {
-                "amount": 2,
-                "unit": "seconds"
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json.active_specialist}}",
+                            "operation": "isNotEmpty"
+                        }
+                    ]
+                }
             },
-            "id": "debounce-wait",
-            "name": "Debounce Wait",
-            "type": "n8n-nodes-base.wait",
+            "id": "check-specialist",
+            "name": "Tiene Especialista?",
+            "type": "n8n-nodes-base.if",
             "typeVersion": 1,
             "position": [
-                250,
+                200,
                 300
             ]
         },
         {
             "parameters": {
-                "model": "llama3-70b-8192",
                 "options": {
-                    "temperature": 0.1
-                }
-            },
-            "id": "groq-lm",
-            "name": "Groq Chat Model",
-            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-            "typeVersion": 1,
-            "position": [
-                450,
-                450
-            ],
-            "credentials": {
-                "groqApi": {
-                    "id": "groq-api-credential-id"
-                }
-            }
-        },
-        {
-            "parameters": {
-                "options": {
-                    "systemMessage": "Eres un clasificador de intenciones experto. Analiza el mensaje del cliente y clasifícalo en: 'Desarrollo Web', 'Desarrollo de Apps', 'Marketing'. Responde solo JSON: {\"intencion\": \"categoría\"}"
+                    "systemMessage": "Eres un clasificador de intenciones experto. Analiza el mensaje del cliente y clasifícalo en: 'web', 'apps', 'marketing'. Responde solo JSON: {\"intencion\": \"categoría\"}"
                 }
             },
             "id": "ai-intent-detector",
@@ -62,43 +47,115 @@
             "type": "@n8n/n8n-nodes-langchain.chainLlm",
             "typeVersion": 1.4,
             "position": [
-                450,
-                250
+                400,
+                150
             ]
         },
         {
             "parameters": {
-                "contextKey": "chat_history"
+                "method": "POST",
+                "url": "https://dev.erpelantar.com/n8n_bridge/update_state",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"params\": {\n    \"channel_id\": {{$node[\"Odoo LiveChat Webhook\"].json[\"res_id\"]}},\n    \"specialist_id\": \"{{$json[\"intencion\"]}}\"\n  }\n}",
+                "options": {}
             },
-            "id": "chat-memory",
-            "name": "Window Buffer Memory",
-            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-            "typeVersion": 1,
+            "id": "update-odoo-state",
+            "name": "Actualizar Estado Odoo",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
             "position": [
-                550,
-                550
+                650,
+                150
             ]
         },
         {
             "parameters": {
-                "resource": "custom",
-                "customResourceId": "mail.channel",
-                "operation": "update",
-                "updateFields": {
-                    "message_post": "Enrutando su consulta al equipo de {{$node[\"Detección de Intención IA\"].json[\"intencion\"]}}..."
+                "dataType": "string",
+                "value1": "={{$node[\"Tiene Especialista?\"].json[\"active_specialist\"] || $node[\"Actualizar Estado Odoo\"].json[\"result\"][\"active_specialist\"]}}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "web"
+                        },
+                        {
+                            "value2": "apps",
+                            "outputIndex": 1
+                        },
+                        {
+                            "value2": "marketing",
+                            "outputIndex": 2
+                        }
+                    ]
                 }
             },
-            "id": "odoo-response",
-            "name": "Odoo Response",
-            "type": "n8n-nodes-base.odoo",
+            "id": "specialist-router",
+            "name": "Router de Especialistas",
+            "type": "n8n-nodes-base.switch",
             "typeVersion": 1,
             "position": [
-                750,
+                900,
                 300
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "mdc7PbFwxXZKimSj",
+                "options": {}
+            },
+            "id": "call-web",
+            "name": "Llamar Especialista Web",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                1150,
+                150
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "k5tE2GtY0EWqkaDe",
+                "options": {}
+            },
+            "id": "call-apps",
+            "name": "Llamar Especialista Apps",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                1150,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "ksIb4ZaQRE1fgbfB",
+                "options": {}
+            },
+            "id": "call-marketing",
+            "name": "Llamar Especialista Marketing",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                1150,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "model": "llama3-70b-8192",
+                "options": {}
+            },
+            "id": "groq-lm",
+            "name": "Groq Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+            "typeVersion": 1,
+            "position": [
+                400,
+                0
             ],
             "credentials": {
-                "odooApi": {
-                    "id": "xLBLBTpTONFN4DAO"
+                "groqApi": {
+                    "id": "nfpxWh3Y5sUHefoj"
                 }
             }
         }
@@ -108,18 +165,72 @@
             "main": [
                 [
                     {
-                        "node": "Debounce Wait",
+                        "node": "Tiene Especialista?",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Debounce Wait": {
+        "Tiene Especialista?": {
             "main": [
                 [
                     {
                         "node": "Detección de Intención IA",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Router de Especialistas",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Detección de Intención IA": {
+            "main": [
+                [
+                    {
+                        "node": "update-odoo-state",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "update-odoo-state": {
+            "main": [
+                [
+                    {
+                        "node": "Router de Especialistas",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Router de Especialistas": {
+            "main": [
+                [
+                    {
+                        "node": "Llamar Especialista Web",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Llamar Especialista Apps",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Llamar Especialista Marketing",
                         "type": "main",
                         "index": 0
                     }
@@ -136,31 +247,6 @@
                     }
                 ]
             ]
-        },
-        "Window Buffer Memory": {
-            "ai_memory": [
-                [
-                    {
-                        "node": "Detección de Intención IA",
-                        "type": "ai_memory",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Detección de Intención IA": {
-            "main": [
-                [
-                    {
-                        "node": "Odoo Response",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
         }
-    },
-    "settings": {
-        "executionOrder": "v1"
     }
 }
