@@ -1,0 +1,108 @@
+{
+    "name": "DEV_GC_Especialista_Marketing",
+    "nodes": [
+        {
+            "parameters": {
+                "amount": 2,
+                "unit": "seconds"
+            },
+            "id": "debounce-wait-marketing",
+            "name": "Debounce Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "llama3-70b-8192",
+                "options": {
+                    "temperature": 0.5
+                }
+            },
+            "id": "groq-lm-marketing",
+            "name": "Groq Chat Model (Marketing)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+            "typeVersion": 1,
+            "position": [
+                350,
+                450
+            ],
+            "credentials": {
+                "groqApi": {
+                    "id": "groq-api-credential-id"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{$json.mensaje_cliente}}",
+                "options": {
+                    "systemMessage": "Eres el Especialista en Marketing Digital. Tu objetivo es obtener: \n1. Objetivos principales (Ventas, Leads, Branding).\n2. Canales de interés (SEO, SEM, Social Media).\n3. Presupuesto mensual publicitario.\n\nResponde de manera profesional y haz la siguiente pregunta necesaria basándote en lo que ya sabes."
+                }
+            },
+            "id": "ai-agent-marketing",
+            "name": "IA Especialista Marketing",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.6,
+            "position": [
+                350,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "contextKey": "chat_history"
+            },
+            "id": "chat-memory-marketing",
+            "name": "Window Buffer Memory",
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1,
+            "position": [
+                450,
+                550
+            ]
+        }
+    ],
+    "connections": {
+        "Debounce Wait": {
+            "main": [
+                [
+                    {
+                        "node": "IA Especialista Marketing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq Chat Model (Marketing)": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "IA Especialista Marketing",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Window Buffer Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "IA Especialista Marketing",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

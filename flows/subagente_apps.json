@@ -1,0 +1,108 @@
+{
+    "name": "DEV_GC_Especialista_Apps",
+    "nodes": [
+        {
+            "parameters": {
+                "amount": 2,
+                "unit": "seconds"
+            },
+            "id": "debounce-wait-apps",
+            "name": "Debounce Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "llama3-70b-8192",
+                "options": {
+                    "temperature": 0.5
+                }
+            },
+            "id": "groq-lm-apps",
+            "name": "Groq Chat Model (Apps)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+            "typeVersion": 1,
+            "position": [
+                350,
+                450
+            ],
+            "credentials": {
+                "groqApi": {
+                    "id": "groq-api-credential-id"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{$json.mensaje_cliente}}",
+                "options": {
+                    "systemMessage": "Eres el Especialista en Desarrollo de Aplicaciones. Tu objetivo es obtener: \n1. Plataformas deseadas (iOS, Android, Web App).\n2. Funcionalidades críticas (ej: Geolocalización, Pagos, Chat).\n3. Plazos estimados de lanzamiento.\n\nResponde de manera profesional y haz la siguiente pregunta necesaria basándote en lo que ya sabes."
+                }
+            },
+            "id": "ai-agent-apps",
+            "name": "IA Especialista Apps",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.6,
+            "position": [
+                350,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "contextKey": "chat_history"
+            },
+            "id": "chat-memory-apps",
+            "name": "Window Buffer Memory",
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1,
+            "position": [
+                450,
+                550
+            ]
+        }
+    ],
+    "connections": {
+        "Debounce Wait": {
+            "main": [
+                [
+                    {
+                        "node": "IA Especialista Apps",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq Chat Model (Apps)": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "IA Especialista Apps",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Window Buffer Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "IA Especialista Apps",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

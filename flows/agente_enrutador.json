@@ -1,0 +1,166 @@
+{
+    "name": "DEV_GC_Agente_Enrutador",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "odoo-livechat-webhook",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Odoo LiveChat Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 2,
+                "unit": "seconds"
+            },
+            "id": "debounce-wait",
+            "name": "Debounce Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "llama3-70b-8192",
+                "options": {
+                    "temperature": 0.1
+                }
+            },
+            "id": "groq-lm",
+            "name": "Groq Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+            "typeVersion": 1,
+            "position": [
+                450,
+                450
+            ],
+            "credentials": {
+                "groqApi": {
+                    "id": "groq-api-credential-id"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "options": {
+                    "systemMessage": "Eres un clasificador de intenciones experto. Analiza el mensaje del cliente y clasifícalo en: 'Desarrollo Web', 'Desarrollo de Apps', 'Marketing'. Responde solo JSON: {\"intencion\": \"categoría\"}"
+                }
+            },
+            "id": "ai-intent-detector",
+            "name": "Detección de Intención IA",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                450,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "contextKey": "chat_history"
+            },
+            "id": "chat-memory",
+            "name": "Window Buffer Memory",
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1,
+            "position": [
+                550,
+                550
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "custom",
+                "customResourceId": "mail.channel",
+                "operation": "update",
+                "updateFields": {
+                    "message_post": "Enrutando su consulta al equipo de {{$node[\"Detección de Intención IA\"].json[\"intencion\"]}}..."
+                }
+            },
+            "id": "odoo-response",
+            "name": "Odoo Response",
+            "type": "n8n-nodes-base.odoo",
+            "typeVersion": 1,
+            "position": [
+                750,
+                300
+            ],
+            "credentials": {
+                "odooApi": {
+                    "id": "xLBLBTpTONFN4DAO"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Odoo LiveChat Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Debounce Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Debounce Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Detección de Intención IA",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Detección de Intención IA",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Window Buffer Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "Detección de Intención IA",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Detección de Intención IA": {
+            "main": [
+                [
+                    {
+                        "node": "Odoo Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Regla de Automatización para enviar mensajes a n8n -->
+        <record id="rule_send_to_n8n" model="base.automation">
+            <name>Bridge n8n: Enviar Mensajes LiveChat</name>
+            <model_id ref="mail.model_mail_message"/>
+            <state>code</state>
+            <trigger>on_create</trigger>
+            <!-- Solo si es un canal de chat y no es un bot/system -->
+            <filter_pre_domain>[('model', '=', 'discuss.channel'), ('author_id', '!=', False)]</filter_pre_domain>
+            <code_python>
+# Lógica para disparar el webhook
+import requests
+import json
+
+webhook_url = "https://n8n.erpelantar.com/webhook/odoo-livechat-v18-production"
+
+# Evitar bucles infinitos (no procesar mensajes que vienen de n8n si tienen un flag específico)
+if record.body and '&lt;span class="n8n-bot"&gt;' not in record.body:
+    payload = {
+        "body": record.body,
+        "author_id": record.author_id.id,
+        "author_name": record.author_id.name,
+        "res_id": record.res_id,
+        "res_model": record.model,
+        "message_id": record.id,
+    }
+    try:
+        requests.post(webhook_url, json=payload, timeout=5)
+    except Exception:
+        pass
+            </code_python>
+        </record>
+    </data>
+</odoo>

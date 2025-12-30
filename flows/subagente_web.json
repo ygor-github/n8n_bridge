@@ -1,0 +1,108 @@
+{
+    "name": "DEV_GC_Especialista_Web",
+    "nodes": [
+        {
+            "parameters": {
+                "amount": 2,
+                "unit": "seconds"
+            },
+            "id": "debounce-wait-web",
+            "name": "Debounce Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "llama3-70b-8192",
+                "options": {
+                    "temperature": 0.5
+                }
+            },
+            "id": "groq-lm-web",
+            "name": "Groq Chat Model (Web)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+            "typeVersion": 1,
+            "position": [
+                350,
+                450
+            ],
+            "credentials": {
+                "groqApi": {
+                    "id": "groq-api-credential-id"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{$json.mensaje_cliente}}",
+                "options": {
+                    "systemMessage": "Eres el Especialista en Desarrollo Web. Tu objetivo es obtener: \n1. Stack preferido (ej: React, Vue, PHP).\n2. Presupuesto estimado.\n3. Tipo de sitio (E-commerce, Corporativo, etc.).\n\nResponde de manera profesional y haz la siguiente pregunta necesaria basándote en lo que ya sabes."
+                }
+            },
+            "id": "ai-agent-web",
+            "name": "IA Especialista Web",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.6,
+            "position": [
+                350,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "contextKey": "chat_history"
+            },
+            "id": "chat-memory-web",
+            "name": "Window Buffer Memory",
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1,
+            "position": [
+                450,
+                550
+            ]
+        }
+    ],
+    "connections": {
+        "Debounce Wait": {
+            "main": [
+                [
+                    {
+                        "node": "IA Especialista Web",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq Chat Model (Web)": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "IA Especialista Web",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Window Buffer Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "IA Especialista Web",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}
