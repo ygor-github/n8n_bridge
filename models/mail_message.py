@@ -15,12 +15,23 @@ class MailMessage(models.Model):
         bot_partner_id = bot_partner.id if bot_partner else False
         
         for record in self:
+            _logger.info("Procesando mensaje %s (Res ID: %s, Model: %s)", record.id, record.res_id, record.model)
+            
             # Evitar bucles: no procesar mensajes del propio bot
             if record.author_id.id == bot_partner_id:
+                _logger.info("Mensaje ignorado: Autor es el Bot n8n.")
                 continue
 
-            # Solo procesar mensajes de canales de chat que no sean del bot
-            if record.model == 'discuss.channel' and record.author_id and '<span class="n8n-bot">' not in (record.body or ''):
+            # Solo procesar mensajes de canales de chat (LiveChat o Discuss)
+            if record.model == 'discuss.channel':
+                # Soporte para Invitados (Odoo 18 usa author_guest_id para LiveChat anonimo)
+                author_name = record.author_id.name or (record.author_guest_id.name if record.author_guest_id else "Invitado")
+                author_id = record.author_id.id or (f"guest_{record.author_guest_id.id}" if record.author_guest_id else "unknown")
+
+                # Verificar si el mensaje ya contiene la marca de bot para evitar bucles visuales
+                if '<span class="n8n-bot">' in (record.body or ''):
+                    _logger.info("Mensaje ignorado: Contiene marca de bot.")
+                    continue
                 
                 # Buscar el estado del bridge para este canal
                 bridge_state = self.env['n8n.bridge.state'].search([
@@ -29,8 +40,8 @@ class MailMessage(models.Model):
 
                 payload = {
                     "body": record.body,
-                    "author_id": record.author_id.id,
-                    "author_name": record.author_id.name,
+                    "author_id": author_id,
+                    "author_name": author_name,
                     "res_id": record.res_id,
                     "res_model": record.model,
                     "message_id": record.id,
@@ -38,8 +49,12 @@ class MailMessage(models.Model):
                     "context_data": json.loads(bridge_state.context_data) if bridge_state and bridge_state.context_data else {},
                 }
 
+                _logger.info("Enviando webhook a n8n: %s", payload)
+
                 try:
-                    # Ejecutar en segundo plano no es trivial aquí, pero usamos timeout
-                    requests.post(webhook_url, json=payload, timeout=5)
+                    resp = requests.post(webhook_url, json=payload, timeout=5)
+                    _logger.info("Respuesta de n8n (Status %s): %s", resp.status_code, resp.text)
                 except Exception as e:
                     _logger.warning("Error al contactar webhook de n8n: %s", e)
+            else:
+                _logger.info("Mensaje ignorado: El modelo no es discuss.channel (es %s)", record.model)
