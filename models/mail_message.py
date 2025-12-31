@@ -11,6 +11,7 @@ class MailMessage(models.Model):
     def _notify_n8n(self):
         """Envía el mensaje a n8n si cumple las condiciones."""
         webhook_url = "https://n8n.erpelantar.com/webhook/odoo-livechat-webhook"
+        # Usar sudo() para buscar el bot y evitar problemas de permisos con Guests
         bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
         bot_partner_id = bot_partner.id if bot_partner else False
         
@@ -18,7 +19,7 @@ class MailMessage(models.Model):
             _logger.info("Procesando mensaje %s (Res ID: %s, Model: %s)", record.id, record.res_id, record.model)
             
             # Evitar bucles: no procesar mensajes del propio bot
-            if record.author_id.id == bot_partner_id:
+            if bot_partner_id and record.author_id.id == bot_partner_id:
                 _logger.info("Mensaje ignorado: Autor es el Bot n8n.")
                 continue
 
@@ -33,8 +34,8 @@ class MailMessage(models.Model):
                     _logger.info("Mensaje ignorado: Contiene marca de bot.")
                     continue
                 
-                # Buscar el estado del bridge para este canal
-                bridge_state = self.env['n8n.bridge.state'].search([
+                # Buscar el estado del bridge con SUDO
+                bridge_state = self.env['n8n.bridge.state'].sudo().search([
                     ('channel_id', '=', record.res_id)
                 ], limit=1)
 
@@ -52,6 +53,7 @@ class MailMessage(models.Model):
                 _logger.info("Enviando webhook a n8n: %s", payload)
 
                 try:
+                    # Usar timeout y no bloquear el hilo de Odoo mas de lo necesario
                     resp = requests.post(webhook_url, json=payload, timeout=5)
                     _logger.info("Respuesta de n8n (Status %s): %s", resp.status_code, resp.text)
                 except Exception as e:
