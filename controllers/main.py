@@ -69,3 +69,23 @@ class N8nBridgeController(http.Controller):
         )
 
         return {"status": "success"}
+
+    @http.route('/n8n_bridge/create_resource', type='json', auth='none', methods=['POST'], csrf=False)
+    def create_resource(self, model, vals):
+        """
+        Endpoint genérico para crear recursos en Odoo (CRM Leads, Proyectos, Facturas).
+        """
+        if not self._check_token():
+            return {"status": "error", "message": "Unauthorized"}
+
+        try:
+            # Crear el registro con sudo()
+            record = request.env[model].sudo().create(vals)
+            
+            return {
+                "status": "success",
+                "id": record.id,
+                "display_name": record.display_name
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}

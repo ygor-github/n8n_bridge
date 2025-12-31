@@ -8,6 +8,7 @@ class N8nBridgeState(models.Model):
     active_specialist_id = fields.Char(string='ID del Especialista Activo', help="ID del workflow de n8n o identificador del especialista.")
     last_interaction = fields.Datetime(string='Última Interacción', default=fields.Datetime.now)
     context_data = fields.Text(string='Contexto Adicional (JSON)', help="Para guardar variables temporales de la sesión.")
+    lead_id = fields.Many2one('crm.lead', string='Oportunidad Generada')
 
     def get_active_specialist(self, channel_id):
         """Devuelve el especialista activo para un canal."""
