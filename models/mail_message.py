@@ -20,7 +20,7 @@ class MailMessage(models.Model):
                 continue
 
             # Solo procesar mensajes de canales de chat que no sean del bot
-            if record.model == 'discuss.channel' and record.author_id and '&lt;span class="n8n-bot"&gt;' not in (record.body or ''):
+            if record.model == 'discuss.channel' and record.author_id and '<span class="n8n-bot">' not in (record.body or ''):
                 
                 # Buscar el estado del bridge para este canal
                 bridge_state = self.env['n8n.bridge.state'].search([
