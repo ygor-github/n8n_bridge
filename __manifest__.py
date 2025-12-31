@@ -8,7 +8,7 @@
         Captures Live Chat messages and routes them to AI agents via webhooks.
     """,
     'author': 'Elantar Ltd.',
-    'depends': ['base', 'mail', 'im_livechat', 'base_automation'],
+    'depends': ['base', 'mail', 'im_livechat', 'base_automation', 'crm'],
     'data': [
         'data/n8n_bot_user.xml',
         'data/automation_rules.xml',

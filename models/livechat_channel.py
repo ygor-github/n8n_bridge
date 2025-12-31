@@ -3,16 +3,15 @@ from odoo import models, api
 class LivechatChannel(models.Model):
     _inherit = 'im_livechat.channel'
 
-    def _is_available(self):
+    def _compute_available_operator_ids(self):
         """
-        Sobrescribe la lógica de disponibilidad para que si el n8n Assistant 
-        está en el canal, siempre se considere disponible.
+        Sobrescribe la disponibilidad de operadores para incluir al Bot de n8n
+        siempre que sea miembro del canal.
         """
-        self.ensure_one()
-        # Verificar si el Bot de n8n es uno de los operadores del canal
-        bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
-        if bot_partner and bot_partner in self.user_ids.partner_id:
-            return True
-            
-        # Si el bot no está, se usa la lógica estándar (humanos online)
-        return super(LivechatChannel, self)._is_available()
+        super()._compute_available_operator_ids()
+        bot_user = self.env.ref('n8n_bridge.user_n8n_bot', raise_if_not_found=False)
+        if bot_user:
+            for record in self:
+                if bot_user in record.user_ids:
+                    # Añadir el bot a los operadores disponibles (forzar online)
+                    record.available_operator_ids = [(4, bot_user.id)]
