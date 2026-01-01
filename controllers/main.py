@@ -89,3 +89,25 @@ class N8nBridgeController(http.Controller):
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    @http.route('/n8n_bridge/search_resource', type='json', auth='none', methods=['POST'], csrf=False)
+    def search_resource(self, model, domain, fields=None, limit=80, order='id desc'):
+        """
+        Endpoint genérico para buscar recursos en Odoo.
+        """
+        if not self._check_token():
+            return {"status": "error", "message": "Unauthorized"}
+
+        try:
+            records = request.env[model].sudo().search_read(
+                domain=domain,
+                fields=fields or ['id', 'display_name'],
+                limit=limit,
+                order=order
+            )
+            return {
+                "status": "success",
+                "result": records
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
