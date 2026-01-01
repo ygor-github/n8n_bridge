@@ -19,7 +19,7 @@ class MailMessage(models.Model):
         bot_partner_id = bot_partner.id if bot_partner else False
         
         for record in self:
-            _logger.info("Procesando mensaje %s (Res ID: %s, Model: %s)", record.id, record.res_id, record.model)
+            _logger.info("DEBUG: _notify_n8n activado para mensaje ID %s (Modelo: %s, Res ID: %s)", record.id, record.model, record.res_id)
             
             # Evitar bucles: no procesar mensajes del propio bot
             if bot_partner_id and record.author_id.id == bot_partner_id:
