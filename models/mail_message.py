@@ -10,7 +10,7 @@ class MailMessage(models.Model):
 
     def _notify_n8n(self):
         """Envía el mensaje a n8n si cumple las condiciones."""
-        webhook_url = "https://n8n.erpelantar.com/webhook/odoo-livechat-webhook"
+        webhook_url = "http://n8n:5678/webhook/odoo-livechat-webhook"
         # Usar sudo() para buscar el bot y evitar problemas de permisos con Guests
         bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
         bot_partner_id = bot_partner.id if bot_partner else False
