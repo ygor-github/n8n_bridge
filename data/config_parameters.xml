@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="n8n_webhook_url" model="ir.config_parameter">
+            <field name="key">n8n_bridge.webhook_url</field>
+            <field name="value">https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook</field>
+        </record>
+    </data>
+</odoo>
