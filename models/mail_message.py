@@ -36,12 +36,23 @@ class MailMessage(models.Model):
                 # Recolección de datos mínima requerida fuera del hilo
                 author_name = "Invitado"
                 author_id = "unknown"
+                is_internal_user = False
+
                 if record.author_id:
                     author_name = record.author_id.name or "Invitado"
                     author_id = record.author_id.id
+                    # Verificar si el autor es un usuario interno (no portal/guest)
+                    user = self.env['res.users'].sudo().search([('partner_id', '=', record.author_id.id)], limit=1)
+                    if user and not user.share:
+                        is_internal_user = True
                 elif record.author_guest_id:
                     author_name = record.author_guest_id.name or "Invitado"
                     author_id = f"guest_{record.author_guest_id.id}"
+
+                # NUEVO: Si es un usuario interno (soporte/staff), NO notificar a n8n
+                if is_internal_user:
+                    _logger.info("BRIDGE: Omnitiendo mensaje de usuario interno: %s", author_name)
+                    continue
 
                 # Estado del bridge
                 bridge_state = self.env['n8n.bridge.state'].sudo().search([
