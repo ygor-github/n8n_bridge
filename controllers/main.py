@@ -65,6 +65,9 @@ class N8nBridgeController(http.Controller):
         Versión HTTP del endpoint para mayor control y evitar errores de despacho JSON-RPC.
         """
         try:
+            _logger.info("BRIDGE: Chat response request received. Content-Type: %s, Raw Data: %s", 
+                         request.httprequest.content_type, request.httprequest.data)
+            
             # Extraer datos JSON si vienen en el body
             if request.httprequest.content_type == 'application/json':
                 data = json.loads(request.httprequest.data.decode('utf-8'))
