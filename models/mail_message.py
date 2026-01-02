@@ -59,10 +59,28 @@ class MailMessage(models.Model):
                     ('channel_id', '=', record.res_id)
                 ], limit=1)
 
+                # NUEVO: Si es un usuario interno (soporte/staff), marcar como 'human' y salir
+                if is_internal_user:
+                    _logger.info("BRIDGE: Usuario interno detectado (%s). Marcando especialista como 'human'.", author_name)
+                    if bridge_state:
+                        bridge_state.write({'active_specialist_id': 'human'})
+                    else:
+                        self.env['n8n.bridge.state'].sudo().create({
+                            'channel_id': record.res_id,
+                            'active_specialist_id': 'human'
+                        })
+                    continue
+
                 context_data = {}
                 active_specialist = False
                 if bridge_state:
                     active_specialist = bridge_state.active_specialist_id
+                    
+                    # NUEVO: Si el especialista activo es 'human', NO notificar a n8n
+                    if active_specialist == 'human':
+                        _logger.info("BRIDGE: Canal en modo 'human'. Ignorando mensaje para n8n.")
+                        continue
+                        
                     if bridge_state.context_data:
                         try:
                             context_data = json.loads(bridge_state.context_data)
