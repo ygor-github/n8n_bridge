@@ -49,10 +49,6 @@ class MailMessage(models.Model):
                     author_name = record.author_guest_id.name or "Invitado"
                     author_id = f"guest_{record.author_guest_id.id}"
 
-                # NUEVO: Si es un usuario interno (soporte/staff), NO notificar a n8n
-                if is_internal_user:
-                    _logger.info("BRIDGE: Omnitiendo mensaje de usuario interno: %s", author_name)
-                    continue
 
                 # Estado del bridge
                 bridge_state = self.env['n8n.bridge.state'].sudo().search([
