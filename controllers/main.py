@@ -96,8 +96,9 @@ class N8nBridgeController(http.Controller):
                 _logger.error("BRIDGE: Partner n8n_bot not found")
                 return request.make_json_response({"status": "error", "message": "Bot partner not found"}, status=500)
 
-            # Publicar el mensaje como el Bot
-            channel.with_context(mail_create_nosummary=True).message_post(
+            # Publicar el mensaje con un usuario válido en el ambiente (evita ValueError en discuss)
+            user_admin = request.env.ref('base.user_admin').sudo()
+            channel.with_user(user_admin).with_context(mail_create_nosummary=True).message_post(
                 body=body,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
