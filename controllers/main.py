@@ -6,6 +6,10 @@ class N8nBridgeController(http.Controller):
 
     def _check_token(self):
         token = request.httprequest.headers.get('X-N8N-Token')
+        # También permitir token en los parámetros JSON para mayor flexibilidad
+        if not token and request.params.get('token'):
+            token = request.params.get('token')
+
         if token != "elantar_n8n_bridge_2025":
             return False
         return True
@@ -48,8 +52,8 @@ class N8nBridgeController(http.Controller):
             "context_data": json.loads(state.context_data) if state.context_data else {}
         }
 
-    @http.route('/n8n_bridge/chat', type='json', auth='none', methods=['POST'], csrf=False)
-    def chat_response(self, channel_id, message):
+    @http.route('/n8n_bridge/chat_response', type='json', auth='none', methods=['POST'], csrf=False)
+    def chat_response(self, channel_id, body):
         if not self._check_token():
             return {"status": "error", "message": "Unauthorized"}
 
@@ -59,10 +63,10 @@ class N8nBridgeController(http.Controller):
 
         # Buscar el ID del partner del bot
         bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot')
-        
+
         # Publicar el mensaje como el Bot
         channel.with_context(mail_create_nosummary=True).message_post(
-            body=message,
+            body=body,
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
             author_id=bot_partner.id
