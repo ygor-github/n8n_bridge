@@ -57,7 +57,7 @@ class MailMessage(models.Model):
 
                 # Si es un usuario interno (soporte/staff), marcar como 'human' y salir
                 if is_internal_user:
-                    _logger.info("BRIDGE DEBUG: Intervención de staff detectada (%s) para canal %s. Forzando modo 'human'.", author_name, record.res_id)
+                    _logger.error("!!! BRIDGE ULTRA-FINAL-DEBUG !!! Intervención de staff detectada (%s) para canal %s. Marcando especialista como 'human'.", author_name, record.res_id)
                     if bridge_state:
                         bridge_state.write({'active_specialist_id': 'human'})
                     else:
@@ -71,7 +71,7 @@ class MailMessage(models.Model):
                 active_specialist = False
                 if bridge_state:
                     active_specialist = bridge_state.active_specialist_id
-                    _logger.info("BRIDGE DEBUG: Canal %s actual especialista: %s", record.res_id, active_specialist)
+                    _logger.error("!!! BRIDGE ULTRA-FINAL-DEBUG !!! Canal %s actual especialista: %s", record.res_id, active_specialist)
                     
                     # Si el especialista activo es 'human', NO notificar a n8n
                     if active_specialist == 'human':
