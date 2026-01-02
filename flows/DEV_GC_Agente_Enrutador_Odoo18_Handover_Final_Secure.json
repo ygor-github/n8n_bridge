@@ -1,0 +1,408 @@
+{
+  "name": "DEV_GC_Agente_Enrutador_Odoo18_Handover_Final_Secure",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "odoo-livechat-webhook",
+        "options": {}
+      },
+      "id": "e26b1caf-27ff-43ad-ab38-114c0600268f",
+      "name": "Odoo_LiveChat_Webhook",
+      "position": [
+        -2224,
+        208
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "webhookId": "8847108b-bf2b-4c9a-b0b0-b5c4666ac670"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"active_specialist\"] }}",
+              "value2": "false"
+            }
+          ]
+        }
+      },
+      "id": "d52b98ac-d452-43b3-a27b-fbe197a3f371",
+      "name": "Tiene_Especialista",
+      "position": [
+        -1328,
+        208
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu tarea es clasificar la intención del cliente en una de las siguientes categorías según su mensaje: \n- `web`: Interés en desarrollo web, landing pages, correcciones web.\n- `apps`: Desarrollo de aplicaciones móviles, software a medida.\n- `marketing`: Servicios de marketing digital, SEO, ads.\n- `ventas`: Dudas generales, primera vez contactando, o si el cliente aún no ha dado información clara sobre su necesidad.\n\nIMPORTANTE: Si el cliente solo saluda (ej: \"hola\", \"buenos días\") o pide información general sin especificar servicio, clasifica siempre como `ventas`.\nResponde ÚNICAMENTE con la palabra clave elegida.\n\nMensaje del cliente: {{$json.body.body}}"
+      },
+      "id": "18551ae9-fb79-4c81-a99c-fd56f550b747",
+      "name": "Deteccion_Intencion_IA",
+      "position": [
+        -1104,
+        336
+      ],
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://elantar_odoo_dev:8069/n8n_bridge/update_state",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Token",
+              "value": "elantar_n8n_bridge_2025"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"jsonrpc\": \"2.0\",\n  \"params\": {\n    \"channel_id\": $node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"res_id\"],\n    \"specialist_id\": $node[\"Deteccion_Intencion_IA\"].json[\"text\"],\n    \"context_data\": $node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"context_data\"] || {}\n  }\n}\n}}",
+        "options": {}
+      },
+      "id": "50b5d03a-a30e-49f2-b650-6ef91d313a52",
+      "name": "Actualizar_Estado_Odoo",
+      "position": [
+        -752,
+        332
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "c60b6999-0f4e-41ea-bb2a-855b2b5af5a0",
+      "name": "Preparar_Datos_Especialista",
+      "position": [
+        -528,
+        208
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "operation": "equal",
+              "value2": "web"
+            },
+            {
+              "operation": "equal",
+              "value2": "apps"
+            },
+            {
+              "operation": "equal",
+              "value2": "marketing"
+            },
+            {
+              "operation": "equal",
+              "value2": "ventas"
+            }
+          ]
+        }
+      },
+      "id": "90e00dc2-f09a-45ee-8d9f-fc1d4188b94f",
+      "name": "Router_de_Especialistas",
+      "position": [
+        -304,
+        176
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "workflowId": "mdc7PbFwxXZKimSj",
+        "options": {}
+      },
+      "id": "cf1c00c9-7654-4e0f-bd0f-623e421e1749",
+      "name": "Llamar_Especialista_Web",
+      "position": [
+        -80,
+        -80
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "workflowId": "k5tE2GtY0EWqkaDe",
+        "options": {}
+      },
+      "id": "d0796686-88bf-47be-854f-8962a7321d4e",
+      "name": "Llamar_Especialista_Apps",
+      "position": [
+        -80,
+        112
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "workflowId": "ksIb4ZaQRE1fgbfB",
+        "options": {}
+      },
+      "id": "c3e6473a-1465-4255-b2c7-e0c109f75c24",
+      "name": "Llamar_Especialista_Marketing",
+      "position": [
+        -80,
+        304
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "id": "099af261-74d4-4763-8799-dc488a4cb4b4",
+      "name": "Groq_Chat_Model",
+      "position": [
+        -1032,
+        556
+      ],
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "credentials": {
+        "groqApi": {
+          "id": "nfpxWh3Y5sUHefoj",
+          "name": "Venta Elantar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "7f57ce67-46fc-4917-b8d4-a227831737a5",
+      "name": "Debounce_Wait_10s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2000,
+        208
+      ],
+      "webhookId": "383ae8ed-aa50-4374-aba5-2f22e0696057"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://elantar_odoo_dev:8069/n8n_bridge/search_resource",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Token",
+              "value": "elantar_n8n_bridge_2025"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"jsonrpc\": \"2.0\",\n  \"params\": {\n    \"model\": \"mail.message\",\n    \"domain\": [\n      [\"res_id\", \"=\", $node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"res_id\"]],\n      [\"model\", \"=\", \"discuss.channel\"]\n    ],\n    \"fields\": [\"id\", \"body\", \"author_id\"],\n    \"limit\": 80,\n    \"order\": \"id desc\"\n  }\n}\n}}",
+        "options": {}
+      },
+      "id": "660d3445-ab48-4a3b-9731-678a147bb0e2",
+      "name": "Obtener_Mensajes_Odoo_V2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -1776,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Acceder al array de mensajes (Odoo JSON-RPC devuelve result.result si el controlador devuelve un dict)\nconst response = $node[\"Obtener_Mensajes_Odoo_V2\"].json;\nconst messages = (response.result && response.result.result) ? response.result.result : [];\n\nif (!Array.isArray(messages)) {\n    return [{ json: { error: \"Odoo response is not an array\", raw: response } }];\n}\n\nconst triggerMessageId = parseInt($node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"message_id\"]);\n\n// 1. Verificar si hay algún mensaje MÁS NUEVO que el que disparó esta ejecución\n// Si lo hay, detenemos esta ejecución porque una posterior manejará el bloque completo.\nconst latestMessageId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) : 0;\n\nif (latestMessageId > triggerMessageId) {\n  return []; \n}\n\n// 2. Filtrar mensajes y ordenar\n// Bot Partner ID: 43. \n// Incluimos mensajes si: author_id es false (Invitado) O si el ID no es el del Bot.\nconst botPartnerId = 43;\nconst relevantMessages = messages\n  .filter(m => {\n      if (!m.author_id) return true; // Es un Invitado/Guest\n      return m.author_id[0] !== botPartnerId;\n  })\n  .sort((a, b) => a.id - b.id);\n\n// 3. Agrupar texto (limpiando HTML)\nconst groupedBody = relevantMessages\n  .map(m => (m.body || \"\").replace(/<[^>]*>/g, \"\"))\n  .filter(text => text.trim().length > 0)\n  .join(\" \");\n\nreturn [{\n  json: {\n    body: {\n        body: groupedBody,\n        res_id: $node[\"Odoo_LiveChat_Webhook\"].json[\"body\"][\"res_id\"]\n    },\n    count: relevantMessages.length\n  }\n}];"
+      },
+      "id": "0bb830ce-6fa6-4e1e-97b3-3ce0d53de4ed",
+      "name": "Agrupar_Mensajes_V2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1552,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "fosld3xZ0rFFj3Wh",
+        "options": {}
+      },
+      "id": "b8089d9a-1c52-42f3-b342-4a4175d06326",
+      "name": "Llamar_Agente_Ventas_Secure_V3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        496
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Odoo_LiveChat_Webhook": {
+      "main": [
+        [
+          {
+            "node": "Debounce_Wait_10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiene_Especialista": {
+      "main": [
+        [
+          {
+            "node": "Preparar_Datos_Especialista",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deteccion_Intencion_IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deteccion_Intencion_IA": {
+      "main": [
+        [
+          {
+            "node": "Actualizar_Estado_Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar_Estado_Odoo": {
+      "main": [
+        [
+          {
+            "node": "Preparar_Datos_Especialista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar_Datos_Especialista": {
+      "main": [
+        [
+          {
+            "node": "Router_de_Especialistas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router_de_Especialistas": {
+      "main": [
+        [
+          {
+            "node": "Llamar_Especialista_Web",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Llamar_Especialista_Apps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Llamar_Especialista_Marketing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Llamar_Agente_Ventas_Secure_V3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq_Chat_Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Deteccion_Intencion_IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debounce_Wait_10s": {
+      "main": [
+        [
+          {
+            "node": "Obtener_Mensajes_Odoo_V2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener_Mensajes_Odoo_V2": {
+      "main": [
+        [
+          {
+            "node": "Agrupar_Mensajes_V2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agrupar_Mensajes_V2": {
+      "main": [
+        [
+          {
+            "node": "Tiene_Especialista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "eac38515-288f-4363-aa61-fe9f6c212313",
+  "meta": {
+    "instanceId": "8d92162fb65bdb9434e701c86866da809de199582977c7568f8547c6013941e5"
+  },
+  "id": "mX5IqeivT9HkSN9w",
+  "tags": []
+}
