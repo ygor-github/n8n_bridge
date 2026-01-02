@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')"/>
+        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-livechat-webhook')"/>
     </data>
 </odoo>
