@@ -59,39 +59,56 @@ class N8nBridgeController(http.Controller):
             "context_data": json.loads(state.context_data) if state.context_data else {}
         }
 
-    @http.route('/n8n_bridge/chat_response', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/n8n_bridge/chat_response', type='http', auth='none', methods=['POST'], csrf=False)
     def chat_response(self, **kwargs):
-        _logger.info("BRIDGE: Chat response received: %s", kwargs)
-        
-        if not self._check_token(**kwargs):
-            return {"status": "error", "message": "Unauthorized"}
+        """
+        Versión HTTP del endpoint para mayor control y evitar errores de despacho JSON-RPC.
+        """
+        try:
+            # Extraer datos JSON si vienen en el body
+            if request.httprequest.content_type == 'application/json':
+                data = json.loads(request.httprequest.data.decode('utf-8'))
+                # Si es JSON-RPC 2.0, los datos reales están en 'params'
+                params = data.get('params', data)
+            else:
+                params = kwargs
 
-        channel_id = kwargs.get('channel_id')
-        body = kwargs.get('body')
-        
-        if not channel_id or not body:
-            _logger.warning("BRIDGE: Missing parameters. channel_id: %s, body: %s", channel_id, body)
-            return {"status": "error", "message": "Missing channel_id or body"}
+            _logger.info("BRIDGE: Chat response received (HTTP). Params: %s", params)
 
-        channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
-        if not channel.exists():
-            return {"status": "error", "message": "Canal no encontrado"}
+            if not self._check_token(**params):
+                _logger.warning("BRIDGE: Unauthorized attempt with token: %s", params.get('token'))
+                return request.make_json_response({"status": "error", "message": "Unauthorized"}, status=401)
 
-        # Buscar el ID del partner del bot
-        bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
-        if not bot_partner:
-            _logger.error("BRIDGE: Partner n8n_bot not found")
-            return {"status": "error", "message": "Bot partner not found"}
+            channel_id = params.get('channel_id')
+            body = params.get('body')
 
-        # Publicar el mensaje como el Bot
-        channel.with_context(mail_create_nosummary=True).message_post(
-            body=body,
-            message_type='comment',
-            subtype_xmlid='mail.mt_comment',
-            author_id=bot_partner.id
-        )
+            if not channel_id or not body:
+                _logger.warning("BRIDGE: Missing parameters. channel_id: %s, body: %s", channel_id, body)
+                return request.make_json_response({"status": "error", "message": "Missing channel_id or body"}, status=400)
 
-        return {"status": "success"}
+            channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
+            if not channel.exists():
+                return request.make_json_response({"status": "error", "message": "Canal no encontrado"}, status=404)
+
+            # Buscar el ID del partner del bot
+            bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+            if not bot_partner:
+                _logger.error("BRIDGE: Partner n8n_bot not found")
+                return request.make_json_response({"status": "error", "message": "Bot partner not found"}, status=500)
+
+            # Publicar el mensaje como el Bot
+            channel.with_context(mail_create_nosummary=True).message_post(
+                body=body,
+                message_type='comment',
+                subtype_xmlid='mail.mt_comment',
+                author_id=bot_partner.id
+            )
+
+            return request.make_json_response({"status": "success"})
+
+        except Exception as e:
+            _logger.exception("BRIDGE: Error processing chat_response")
+            return request.make_json_response({"status": "error", "message": str(e)}, status=500)
 
     @http.route('/n8n_bridge/create_resource', type='json', auth='none', methods=['POST'], csrf=False)
     def create_resource(self, model, vals):
