@@ -1,24 +1,31 @@
 import json
+import logging
 from odoo import http
 from odoo.http import request
 
+_logger = logging.getLogger(__name__)
+
 class N8nBridgeController(http.Controller):
 
-    def _check_token(self):
+    def _check_token(self, **kwargs):
         token = request.httprequest.headers.get('X-N8N-Token')
         # También permitir token en los parámetros JSON para mayor flexibilidad
-        if not token and request.params.get('token'):
-            token = request.params.get('token')
+        if not token:
+            token = kwargs.get('token')
 
         if token != "elantar_n8n_bridge_2025":
             return False
         return True
 
     @http.route('/n8n_bridge/update_state', type='json', auth='none', methods=['POST'], csrf=False)
-    def update_bridge_state(self, channel_id, specialist_id=None, context_data=None):
-        if not self._check_token():
+    def update_bridge_state(self, **kwargs):
+        if not self._check_token(**kwargs):
             return {"status": "error", "message": "Unauthorized"}
             
+        channel_id = kwargs.get('channel_id')
+        specialist_id = kwargs.get('specialist_id')
+        context_data = kwargs.get('context_data')
+        
         state_model = request.env['n8n.bridge.state'].sudo()
         
         # Validar si el contexto es un diccionario y convertirlo a string
@@ -53,16 +60,28 @@ class N8nBridgeController(http.Controller):
         }
 
     @http.route('/n8n_bridge/chat_response', type='json', auth='none', methods=['POST'], csrf=False)
-    def chat_response(self, channel_id, body):
-        if not self._check_token():
+    def chat_response(self, **kwargs):
+        _logger.info("BRIDGE: Chat response received: %s", kwargs)
+        
+        if not self._check_token(**kwargs):
             return {"status": "error", "message": "Unauthorized"}
 
+        channel_id = kwargs.get('channel_id')
+        body = kwargs.get('body')
+        
+        if not channel_id or not body:
+            _logger.warning("BRIDGE: Missing parameters. channel_id: %s, body: %s", channel_id, body)
+            return {"status": "error", "message": "Missing channel_id or body"}
+
         channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
-        if not channel:
+        if not channel.exists():
             return {"status": "error", "message": "Canal no encontrado"}
 
         # Buscar el ID del partner del bot
-        bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot')
+        bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+        if not bot_partner:
+            _logger.error("BRIDGE: Partner n8n_bot not found")
+            return {"status": "error", "message": "Bot partner not found"}
 
         # Publicar el mensaje como el Bot
         channel.with_context(mail_create_nosummary=True).message_post(
