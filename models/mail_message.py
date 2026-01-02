@@ -9,38 +9,54 @@ class MailMessage(models.Model):
     _inherit = 'mail.message'
 
     def _notify_n8n(self):
-        """Envía el mensaje a n8n si cumple las condiciones."""
-        # Obtener URL del webhook desde parámetros del sistema
-        icp = self.env['ir.config_parameter'].sudo()
-        webhook_url = icp.get_param('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')
-        
-        # Usar sudo() para buscar el bot y evitar problemas de permisos con Guests
-        bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
-        bot_partner_id = bot_partner.id if bot_partner else False
-        
-        for record in self:
-            _logger.info("DEBUG: _notify_n8n activado para mensaje ID %s (Modelo: %s, Res ID: %s)", record.id, record.model, record.res_id)
+        """Envía el mensaje a n8n de forma asíncrona y ultra-segura."""
+        try:
+            import threading
+            # Obtener URL del webhook desde parámetros del sistema
+            icp = self.env['ir.config_parameter'].sudo()
+            webhook_url = icp.get_param('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')
             
-            # Evitar bucles: no procesar mensajes del propio bot
-            if bot_partner_id and record.author_id.id == bot_partner_id:
-                _logger.info("Mensaje ignorado: Autor es el Bot n8n.")
-                continue
-
-            # Solo procesar mensajes de canales de chat (LiveChat o Discuss)
-            if record.model == 'discuss.channel':
-                # Soporte para Invitados (Odoo 18 usa author_guest_id para LiveChat anonimo)
-                author_name = record.author_id.name or (record.author_guest_id.name if record.author_guest_id else "Invitado")
-                author_id = record.author_id.id or (f"guest_{record.author_guest_id.id}" if record.author_guest_id else "unknown")
-
-                # Verificar si el mensaje ya contiene la marca de bot para evitar bucles visuales
-                if '<span class="n8n-bot">' in (record.body or ''):
-                    _logger.info("Mensaje ignorado: Contiene marca de bot.")
+            # Bot Partner
+            bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+            bot_partner_id = bot_partner.id if bot_partner else False
+            
+            for record in self:
+                # Filtros rápidos súper seguros
+                if not record.model or not record.res_id or record.model != 'discuss.channel':
                     continue
-                
-                # Buscar el estado del bridge con SUDO
+
+                # Evitar bucles: no procesar mensajes del propio bot
+                if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
+                    continue
+
+                # Evitar bucles visuales: marca n8n-bot
+                if record.body and '<span class="n8n-bot">' in record.body:
+                    continue
+
+                # Recolección de datos mínima requerida fuera del hilo
+                author_name = "Invitado"
+                author_id = "unknown"
+                if record.author_id:
+                    author_name = record.author_id.name or "Invitado"
+                    author_id = record.author_id.id
+                elif record.author_guest_id:
+                    author_name = record.author_guest_id.name or "Invitado"
+                    author_id = f"guest_{record.author_guest_id.id}"
+
+                # Estado del bridge
                 bridge_state = self.env['n8n.bridge.state'].sudo().search([
                     ('channel_id', '=', record.res_id)
                 ], limit=1)
+
+                context_data = {}
+                active_specialist = False
+                if bridge_state:
+                    active_specialist = bridge_state.active_specialist_id
+                    if bridge_state.context_data:
+                        try:
+                            context_data = json.loads(bridge_state.context_data)
+                        except:
+                            pass
 
                 payload = {
                     "body": record.body,
@@ -49,17 +65,19 @@ class MailMessage(models.Model):
                     "res_id": record.res_id,
                     "res_model": record.model,
                     "message_id": record.id,
-                    "active_specialist": bridge_state.active_specialist_id if bridge_state else False,
-                    "context_data": json.loads(bridge_state.context_data) if bridge_state and bridge_state.context_data else {},
+                    "active_specialist": active_specialist,
+                    "context_data": context_data,
                 }
 
-                _logger.info("Enviando webhook a n8n: %s", payload)
+                # Lanzar hilo para enviar el webhook sin bloquear Odoo
+                def send_to_n8n(url, data):
+                    try:
+                        _logger.info("BRIDGE: Enviando webhook asíncrono a %s", url)
+                        requests.post(url, json=data, timeout=5)
+                    except Exception as e:
+                        _logger.warning("BRIDGE: Error en hilo de envío a n8n: %s", e)
 
-                try:
-                    # Usar timeout y no bloquear el hilo de Odoo mas de lo necesario
-                    resp = requests.post(webhook_url, json=payload, timeout=5)
-                    _logger.info("Respuesta de n8n (Status %s): %s", resp.status_code, resp.text)
-                except Exception as e:
-                    _logger.warning("Error al contactar webhook de n8n: %s", e)
-            else:
-                _logger.info("Mensaje ignorado: El modelo no es discuss.channel (es %s)", record.model)
+                threading.Thread(target=send_to_n8n, args=(webhook_url, payload)).start()
+
+        except Exception as e:
+            _logger.error("CRITICAL BRIDGE ERROR: Fallo total en _notify_n8n: %s", e)
