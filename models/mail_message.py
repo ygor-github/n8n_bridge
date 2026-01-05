@@ -26,15 +26,16 @@ class MailMessage(models.Model):
                 _logger.info("BRIDGE: Procesando mensaje ID %s, modelo: %s, res_id: %s", record.id, record.model, record.res_id)
                 # Filtros rápidos
                 if not record.model or not record.res_id or record.model != 'discuss.channel':
-                    _logger.debug("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
+                    _logger.info("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
                     continue
 
                 # Evitar bucles
                 if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
-                    _logger.debug("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
+                    _logger.info("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
                     continue
 
                 if record.body and '<span class="n8n-bot">' in record.body:
+                    _logger.info("BRIDGE: Ignorando mensaje %s (contiene firma de bot)", record.id)
                     continue
 
                 # Obtener canal y su configuración específica
@@ -69,7 +70,7 @@ class MailMessage(models.Model):
                 ], limit=1)
 
                 if is_internal_user:
-                    _logger.debug("Intervención de staff detectada en canal %s. Silenciando bot.", record.res_id)
+                    _logger.info("BRIDGE: Intervención de staff detectada en canal %s. Silenciando bot.", record.res_id)
                     if bridge_state:
                         bridge_state.write({'active_specialist_id': 'human'})
                     else:
@@ -79,12 +80,10 @@ class MailMessage(models.Model):
                         })
                     continue
 
-                context_data = {}
-                active_specialist = False
                 if bridge_state:
                     active_specialist = bridge_state.active_specialist_id
                     if active_specialist == 'human':
-                        _logger.debug("Bot silenciado para canal %s.", record.res_id)
+                        _logger.info("BRIDGE: Bot silenciado para canal %s (modo humano activo).", record.res_id)
                         continue
                         
                     if bridge_state.context_data:
