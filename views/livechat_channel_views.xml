@@ -18,7 +18,7 @@
                             </group>
                         </group>
                         <div class="alert alert-warning" role="alert">
-                            <i class="fa fa-exclamation-triangle"/> <strong>Es obligatorio</strong> configurar la URL y el Token para que este canal funcione con n8n.
+                            <i class="fa fa-exclamation-triangle" title="Advertencia" role="img" aria-label="Advertencia"/> <strong>Es obligatorio</strong> configurar la URL y el Token para que este canal funcione con n8n.
                         </div>
                     </page>
                 </xpath>
