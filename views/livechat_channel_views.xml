@@ -1,1 +1,28 @@
-<odoo></odoo>
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="im_livechat_channel_view_form_n8n" model="ir.ui.view">
+            <field name="name">im_livechat.channel.view_form_n8n</field>
+            <field name="model">im_livechat.channel</field>
+            <field name="inherit_id" ref="im_livechat.im_livechat_channel_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Configuración n8n" name="n8n_config">
+                        <group>
+                            <group string="Webhooks">
+                                <field name="n8n_webhook_url" placeholder="https://n8n.ejemplo.com/webhook/..."/>
+                            </group>
+                            <group string="Seguridad y Tokens">
+                                <field name="n8n_outgoing_token" password="True"/>
+                                <field name="n8n_incoming_token" password="True"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fa fa-exclamation-triangle"/> <strong>Es obligatorio</strong> configurar la URL y el Token para que este canal funcione con n8n.
+                        </div>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
