@@ -20,10 +20,17 @@ class N8nBridgeController(http.Controller):
                     expected_token = channel.livechat_channel_id.n8n_incoming_token
                     if expected_token:
                         return token == expected_token
-            except:
-                pass
+                
+                # Si llegamos aquí con channel_id, pero no hay token configurado o no existe el canal, denegamos.
+                _logger.warning("BRIDGE: Intento de acceso a canal %s sin configuración n8n válida.", channel_id)
+                return False
+            except Exception as e:
+                _logger.error("BRIDGE: Error validando token de canal: %s", e)
+                return False
 
-        # Fallback al token global
+        # Solo permitir el token global para peticiones que NO tienen channel_id (ej. búsqueda genérica si se requiere)
+        # Pero si el requerimiento es "eliminar respaldo global", podríamos ser incluso más estrictos.
+        # Por ahora lo mantenemos solo para endpoints globales NO asociados directamente a chats de canal.
         return token == "elantar_n8n_bridge_2025"
 
     @http.route('/n8n_bridge/update_state', type='json', auth='none', methods=['POST'], csrf=False)

@@ -37,14 +37,12 @@ class MailMessage(models.Model):
                 channel = self.env['discuss.channel'].sudo().browse(record.res_id)
                 livechat_channel = channel.livechat_channel_id
                 
-                webhook_url = global_webhook_url
-                outgoing_token = global_token
+                if not livechat_channel or not livechat_channel.n8n_webhook_url or not livechat_channel.n8n_outgoing_token:
+                    _logger.warning("BRIDGE: El canal %s no tiene configuración de n8n (webhook/token). Ignorando mensaje.", record.res_id)
+                    continue
 
-                if livechat_channel:
-                    if livechat_channel.n8n_webhook_url:
-                        webhook_url = livechat_channel.n8n_webhook_url
-                    if livechat_channel.n8n_outgoing_token:
-                        outgoing_token = livechat_channel.n8n_outgoing_token
+                webhook_url = livechat_channel.n8n_webhook_url
+                outgoing_token = livechat_channel.n8n_outgoing_token
 
                 # Recolección de datos
                 author_name = "Invitado"
