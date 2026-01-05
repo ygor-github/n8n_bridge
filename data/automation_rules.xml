@@ -1,17 +1,19 @@
 <odoo>
-    <!-- Acción de Servidor que ejecuta el código Python -->
-    <record id="action_send_to_n8n" model="ir.actions.server">
-        <field name="name">Bridge n8n: Ejecutar Webhook</field>
-        <field name="model_id" ref="mail.model_mail_message"/>
-        <field name="state">code</field>
-        <field name="code">record._notify_n8n()</field>
-    </record>
+    <data>
+        <!-- Acción de Servidor que ejecuta el código Python -->
+        <record id="action_send_to_n8n" model="ir.actions.server">
+            <field name="name">Bridge n8n: Ejecutar Webhook</field>
+            <field name="model_id" ref="mail.model_mail_message"/>
+            <field name="state">code</field>
+            <field name="code">record._notify_n8n()</field>
+        </record>
 
-    <!-- Regla de Automatización que dispara la acción -->
-    <record id="rule_send_to_n8n" model="base.automation">
-        <field name="name">Bridge n8n: Enviar Mensajes LiveChat</field>
-        <field name="model_id" ref="mail.model_mail_message"/>
-        <field name="trigger">on_create</field>
-        <field name="action_server_ids" eval="[(4, ref('action_send_to_n8n'))]"/>
-    </record>
+        <!-- Regla de Automatización que dispara la acción -->
+        <record id="rule_send_to_n8n" model="base.automation">
+            <field name="name">Bridge n8n: Enviar Mensajes LiveChat</field>
+            <field name="model_id" ref="mail.model_mail_message"/>
+            <field name="trigger">on_create</field>
+            <field name="action_server_ids" eval="[(4, ref('action_send_to_n8n'))]"/>
+        </record>
+    </data>
 </odoo>

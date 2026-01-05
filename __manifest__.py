@@ -10,6 +10,7 @@
     'author': 'Elantar Ltd.',
     'depends': ['base', 'mail', 'im_livechat', 'base_automation', 'crm'],
     'data': [
+        'security/ir.model.access.csv',
         'data/n8n_bot_user.xml',
         'data/automation_rules.xml',
         'data/config_parameters.xml',
