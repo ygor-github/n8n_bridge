@@ -1,7 +1,20 @@
-from odoo import models, api
+from odoo import models, fields, api
 
 class LivechatChannel(models.Model):
     _inherit = 'im_livechat.channel'
+
+    n8n_webhook_url = fields.Char(
+        string='URL del Webhook de n8n',
+        help="URL específica de n8n para este canal. Si está vacía, se usará la configuración global."
+    )
+    n8n_outgoing_token = fields.Char(
+        string='Token Odoo -> n8n',
+        help="Token enviado en el encabezado X-N8N-Token para validar peticiones enviadas a n8n."
+    )
+    n8n_incoming_token = fields.Char(
+        string='Token n8n -> Odoo',
+        help="Token requerido para las peticiones que n8n envía a Odoo para este canal."
+    )
 
     def _compute_available_operator_ids(self):
         """

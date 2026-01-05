@@ -9,13 +9,22 @@ class N8nBridgeController(http.Controller):
 
     def _check_token(self, **kwargs):
         token = request.httprequest.headers.get('X-N8N-Token')
-        # También permitir token en los parámetros JSON para mayor flexibilidad
         if not token:
             token = kwargs.get('token')
 
-        if token != "elantar_n8n_bridge_2025":
-            return False
-        return True
+        channel_id = kwargs.get('channel_id')
+        if channel_id:
+            try:
+                channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
+                if channel.exists() and channel.livechat_channel_id:
+                    expected_token = channel.livechat_channel_id.n8n_incoming_token
+                    if expected_token:
+                        return token == expected_token
+            except:
+                pass
+
+        # Fallback al token global
+        return token == "elantar_n8n_bridge_2025"
 
     @http.route('/n8n_bridge/update_state', type='json', auth='none', methods=['POST'], csrf=False)
     def update_bridge_state(self, **kwargs):

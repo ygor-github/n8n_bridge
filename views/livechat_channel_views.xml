@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="im_livechat_channel_view_form_n8n" model="ir.ui.view">
+        <name>im_livechat.channel.view.form.n8n</name>
+        <model>im_livechat.channel</model>
+        <inherit_id ref="im_livechat.im_livechat_channel_view_form"/>
+        <arch type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Configuración n8n" name="n8n_config">
+                    <group>
+                        <group string="Webhooks">
+                            <field name="n8n_webhook_url" placeholder="https://n8n.ejemplo.com/webhook/..."/>
+                        </group>
+                        <group string="Seguridad y Tokens">
+                            <field name="n8n_outgoing_token" password="True"/>
+                            <field name="n8n_incoming_token" password="True"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <i class="fa fa-info-circle"/> Si los campos están vacíos, el sistema utilizará la configuración global por defecto.
+                    </div>
+                </page>
+            </xpath>
+        </arch>
+    </record>
+</odoo>

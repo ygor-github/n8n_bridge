@@ -13,6 +13,7 @@
         'data/n8n_bot_user.xml',
         'data/automation_rules.xml',
         'data/config_parameters.xml',
+        'views/livechat_channel_views.xml',
     ],
     'installable': True,
     'application': True,

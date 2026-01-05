@@ -9,31 +9,44 @@ class MailMessage(models.Model):
     _inherit = 'mail.message'
 
     def _notify_n8n(self):
-        """Envía el mensaje a n8n de forma asíncrona y ultra-segura."""
+        """Envía el mensaje a n8n de forma asíncrona usando configuración por canal."""
         try:
             import threading
-            # Obtener URL del webhook desde parámetros del sistema
-            icp = self.env['ir.config_parameter'].sudo()
-            webhook_url = icp.get_param('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')
             
-            # Bot Partner
+            # Bot Partner para evitar bucles
             bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
             bot_partner_id = bot_partner.id if bot_partner else False
             
+            icp = self.env['ir.config_parameter'].sudo()
+            global_webhook_url = icp.get_param('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')
+            global_token = "elantar_n8n_bridge_2025" # Backup token
+
             for record in self:
-                # Filtros rápidos súper seguros
+                # Filtros rápidos
                 if not record.model or not record.res_id or record.model != 'discuss.channel':
                     continue
 
-                # Evitar bucles: no procesar mensajes del propio bot
+                # Evitar bucles
                 if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
                     continue
 
-                # Evitar bucles visuales: marca n8n-bot
                 if record.body and '<span class="n8n-bot">' in record.body:
                     continue
 
-                # Recolección de datos mínima requerida fuera del hilo
+                # Obtener canal y su configuración específica
+                channel = self.env['discuss.channel'].sudo().browse(record.res_id)
+                livechat_channel = channel.livechat_channel_id
+                
+                webhook_url = global_webhook_url
+                outgoing_token = global_token
+
+                if livechat_channel:
+                    if livechat_channel.n8n_webhook_url:
+                        webhook_url = livechat_channel.n8n_webhook_url
+                    if livechat_channel.n8n_outgoing_token:
+                        outgoing_token = livechat_channel.n8n_outgoing_token
+
+                # Recolección de datos
                 author_name = "Invitado"
                 author_id = "unknown"
                 is_internal_user = False
@@ -41,7 +54,6 @@ class MailMessage(models.Model):
                 if record.author_id:
                     author_name = record.author_id.name or "Invitado"
                     author_id = record.author_id.id
-                    # Verificar si el autor es un usuario interno (no portal/guest)
                     user = self.env['res.users'].sudo().search([('partner_id', '=', record.author_id.id)], limit=1)
                     if user and not user.share:
                         is_internal_user = True
@@ -49,19 +61,17 @@ class MailMessage(models.Model):
                     author_name = record.author_guest_id.name or "Invitado"
                     author_id = f"guest_{record.author_guest_id.id}"
 
-
-                # Estado del bridge (Búsqueda sudo para evitar problemas de permisos)
+                # Estado del bridge
                 bridge_state = self.env['n8n.bridge.state'].sudo().search([
                     ('channel_id', '=', record.res_id)
                 ], limit=1)
 
-                # Si es un usuario interno (soporte/staff), marcar como 'human' y salir
                 if is_internal_user:
-                    _logger.error("!!! BRIDGE ULTRA-FINAL-DEBUG !!! Intervención de staff detectada (%s) para canal %s. Marcando especialista como 'human'.", author_name, record.res_id)
+                    _logger.debug("Intervención de staff detectada en canal %s. Silenciando bot.", record.res_id)
                     if bridge_state:
                         bridge_state.write({'active_specialist_id': 'human'})
                     else:
-                        bridge_state = self.env['n8n.bridge.state'].sudo().create({
+                        self.env['n8n.bridge.state'].sudo().create({
                             'channel_id': record.res_id,
                             'active_specialist_id': 'human'
                         })
@@ -71,11 +81,8 @@ class MailMessage(models.Model):
                 active_specialist = False
                 if bridge_state:
                     active_specialist = bridge_state.active_specialist_id
-                    _logger.error("!!! BRIDGE ULTRA-FINAL-DEBUG !!! Canal %s actual especialista: %s", record.res_id, active_specialist)
-                    
-                    # Si el especialista activo es 'human', NO notificar a n8n
                     if active_specialist == 'human':
-                        _logger.info("BRIDGE: El bot está SILENCIADO. Un humano tiene el control en canal %s.", record.res_id)
+                        _logger.debug("Bot silenciado para canal %s.", record.res_id)
                         continue
                         
                     if bridge_state.context_data:
@@ -95,15 +102,16 @@ class MailMessage(models.Model):
                     "context_data": context_data,
                 }
 
-                # Lanzar hilo para enviar el webhook sin bloquear Odoo
-                def send_to_n8n(url, data):
+                # Lanzar hilo para enviar el webhook
+                def send_to_n8n(url, token, data):
                     try:
-                        _logger.info("BRIDGE: Enviando webhook asíncrono a %s", url)
-                        requests.post(url, json=data, timeout=5)
+                        headers = {'X-N8N-Token': token}
+                        _logger.info("BRIDGE: Enviando webhook a %s con token", url)
+                        requests.post(url, json=data, headers=headers, timeout=5)
                     except Exception as e:
-                        _logger.warning("BRIDGE: Error en hilo de envío a n8n: %s", e)
+                        _logger.warning("BRIDGE: Error en envío a n8n: %s", e)
 
-                threading.Thread(target=send_to_n8n, args=(webhook_url, payload)).start()
+                threading.Thread(target=send_to_n8n, args=(webhook_url, outgoing_token, payload)).start()
 
         except Exception as e:
-            _logger.error("CRITICAL BRIDGE ERROR: Fallo total en _notify_n8n: %s", e)
+            _logger.error("CRITICAL BRIDGE ERROR: Fallo en _notify_n8n: %s", e)
