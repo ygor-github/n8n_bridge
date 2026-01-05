@@ -10,6 +10,7 @@ class MailMessage(models.Model):
 
     def _notify_n8n(self):
         """Envía el mensaje a n8n de forma asíncrona usando configuración por canal."""
+        _logger.info("BRIDGE: _notify_n8n disparado para %s registros", len(self))
         try:
             import threading
             
@@ -22,12 +23,15 @@ class MailMessage(models.Model):
             global_token = "elantar_n8n_bridge_2025" # Backup token
 
             for record in self:
+                _logger.info("BRIDGE: Procesando mensaje ID %s, modelo: %s, res_id: %s", record.id, record.model, record.res_id)
                 # Filtros rápidos
                 if not record.model or not record.res_id or record.model != 'discuss.channel':
+                    _logger.debug("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
                     continue
 
                 # Evitar bucles
                 if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
+                    _logger.debug("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
                     continue
 
                 if record.body and '<span class="n8n-bot">' in record.body:
