@@ -1,7 +1,8 @@
-from odoo import models, api
-import requests
 import json
 import logging
+import os
+import requests
+import threading
 
 _logger = logging.getLogger(__name__)
 
@@ -9,50 +10,60 @@ class MailMessage(models.Model):
     _inherit = 'mail.message'
 
     def _notify_n8n(self):
-        """Envía el mensaje a n8n de forma asíncrona usando configuración por canal."""
-        _logger.info("BRIDGE: _notify_n8n disparado para %s registros", len(self))
+        """Envía el mensaje a n8n usando configuración dinámica (Canal > Env > ICP)."""
+        _logger.info("BRIDGE: _notify_n8n disparado")
         try:
-            import threading
             
             # Bot Partner para evitar bucles
             bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
             bot_partner_id = bot_partner.id if bot_partner else False
             
-            icp = self.env['ir.config_parameter'].sudo()
-            global_webhook_url = icp.get_param('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-diagnostic-webhook')
-            global_token = "elantar_n8n_bridge_2025" # Backup token
-
-            for record in self:
-                _logger.info("BRIDGE: Procesando mensaje ID %s, modelo: %s, res_id: %s", record.id, record.model, record.res_id)
-                # Filtros rápidos
-                if not record.model or not record.res_id or record.model != 'discuss.channel':
-                    _logger.info("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
-                    continue
-
-                # Evitar bucles
-                if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
-                    _logger.info("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
-                    continue
-
-                if record.body and '<span class="n8n-bot">' in record.body:
-                    _logger.info("BRIDGE: Ignorando mensaje %s (contiene firma de bot)", record.id)
-                    continue
-
-                # Obtener canal y su configuración específica
+                # 1. Obtener Canal y fallback de Webhook/Token
                 channel = self.env['discuss.channel'].sudo().browse(record.res_id)
                 livechat_channel = channel.livechat_channel_id
                 
-                if not livechat_channel or not livechat_channel.n8n_webhook_url or not livechat_channel.n8n_outgoing_token:
-                    _logger.warning("BRIDGE: El canal %s no tiene configuración de n8n (webhook/token). Ignorando mensaje.", record.res_id)
+                # Jerarquía de configuración: 
+                # A. Canal específico
+                # B. Variable de entorno
+                # C. Parámetro de sistema (ICP)
+                
+                webhook_url = False
+                outgoing_token = False
+                source = "unknown"
+
+                # A. Probar Canal
+                if livechat_channel:
+                    webhook_url = livechat_channel.n8n_webhook_url
+                    outgoing_token = livechat_channel.n8n_outgoing_token
+                    source = "Canal LiveChat"
+
+                # B. Probar Variables de Entorno
+                if not webhook_url:
+                    webhook_url = os.environ.get('N8N_BRIDGE_WEBHOOK_URL')
+                    outgoing_token = os.environ.get('N8N_BRIDGE_OUTGOING_TOKEN')
+                    source = "Variables de Entorno (.env)"
+                
+                # C. Probar ICP (Parámetros del sistema)
+                if not webhook_url:
+                    icp = self.env['ir.config_parameter'].sudo()
+                    webhook_url = icp.get_param('n8n_bridge.webhook_url')
+                    outgoing_token = icp.get_param('n8n_bridge.outgoing_token')
+                    source = "Parámetros del Sistema (ICP)"
+
+                if not webhook_url:
+                    _logger.warning("BRIDGE: Mensaje %s ignorado. No hay URL de webhook configurada (Canal/Env/ICP).", record.id)
                     continue
 
-                webhook_url = livechat_channel.n8n_webhook_url
-                outgoing_token = livechat_channel.n8n_outgoing_token
+                _logger.info("BRIDGE: Usando configuración desde %s para canal %s", source, record.res_id)
 
                 # Recolección de datos
                 author_name = "Invitado"
                 author_id = "unknown"
                 is_internal_user = False
+
+                # Campos adicionales para el payload
+                active_specialist = 'bot'
+                context_data = {}
 
                 if record.author_id:
                     author_name = record.author_id.name or "Invitado"
@@ -108,7 +119,8 @@ class MailMessage(models.Model):
                     try:
                         headers = {'X-N8N-Token': token}
                         _logger.info("BRIDGE: Enviando webhook a %s con token", url)
-                        requests.post(url, json=data, headers=headers, timeout=5)
+                        response = requests.post(url, json=data, headers=headers, timeout=5)
+                        _logger.info("BRIDGE: Respuesta de n8n [%s]: %s", response.status_code, response.text[:200])
                     except Exception as e:
                         _logger.warning("BRIDGE: Error en envío a n8n: %s", e)
 

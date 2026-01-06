@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.webhook_url', 'https://n8n.erpelantar.com/webhook/odoo-livechat-webhook')"/>
+        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.webhook_url', 'http://n8n:5678/webhook/odoo-livechat-webhook')"/>
+        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.outgoing_token', 'elantar_n8n_bridge_2025')"/>
+        <function model="ir.config_parameter" name="set_param" eval="('n8n_bridge.incoming_token', 'elantar_n8n_bridge_2025')"/>
     </data>
 </odoo>

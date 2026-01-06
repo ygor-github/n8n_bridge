@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from odoo import http
 from odoo.http import request
 
@@ -13,25 +14,34 @@ class N8nBridgeController(http.Controller):
             token = kwargs.get('token')
 
         channel_id = kwargs.get('channel_id')
+        
+        # 1. Probar Token del Canal
         if channel_id:
             try:
                 channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
                 if channel.exists() and channel.livechat_channel_id:
                     expected_token = channel.livechat_channel_id.n8n_incoming_token
-                    if expected_token:
-                        return token == expected_token
-                
-                # Si llegamos aquí con channel_id, pero no hay token configurado o no existe el canal, denegamos.
-                _logger.warning("BRIDGE: Intento de acceso a canal %s sin configuración n8n válida.", channel_id)
-                return False
+                    if expected_token and token == expected_token:
+                        return True
             except Exception as e:
                 _logger.error("BRIDGE: Error validando token de canal: %s", e)
-                return False
 
-        # Solo permitir el token global para peticiones que NO tienen channel_id (ej. búsqueda genérica si se requiere)
-        # Pero si el requerimiento es "eliminar respaldo global", podríamos ser incluso más estrictos.
-        # Por ahora lo mantenemos solo para endpoints globales NO asociados directamente a chats de canal.
-        return token == "elantar_n8n_bridge_2025"
+        # 2. Probar Token de Variables de Entorno
+        env_token = os.environ.get('N8N_BRIDGE_INCOMING_TOKEN')
+        if env_token and token == env_token:
+            return True
+
+        # 3. Probar Token de Parámetros del Sistema (ICP)
+        icp_token = request.env['ir.config_parameter'].sudo().get_param('n8n_bridge.incoming_token')
+        if icp_token and token == icp_token:
+            return True
+
+        # 4. Backup token (Hardcoded - Solo para compatibilidad transicional, se eliminará)
+        if token == "elantar_n8n_bridge_2025":
+            return True
+
+        _logger.warning("BRIDGE: Intento de acceso no autorizado. Channel: %s, Token: %s", channel_id, token[:5] if token else "None")
+        return False
 
     @http.route('/n8n_bridge/update_state', type='json', auth='none', methods=['POST'], csrf=False)
     def update_bridge_state(self, **kwargs):
