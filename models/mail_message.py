@@ -1,3 +1,4 @@
+from odoo import models, api
 import json
 import logging
 import os
