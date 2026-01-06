@@ -18,6 +18,22 @@ class MailMessage(models.Model):
             bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
             bot_partner_id = bot_partner.id if bot_partner else False
             
+            for record in self:
+                _logger.info("BRIDGE: Procesando mensaje ID %s, modelo: %s, res_id: %s", record.id, record.model, record.res_id)
+                # Filtros rápidos
+                if not record.model or not record.res_id or record.model != 'discuss.channel':
+                    _logger.info("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
+                    continue
+
+                # Evitar bucles
+                if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
+                    _logger.info("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
+                    continue
+
+                if record.body and '<span class="n8n-bot">' in record.body:
+                    _logger.info("BRIDGE: Ignorando mensaje %s (contiene firma de bot)", record.id)
+                    continue
+
                 # 1. Obtener Canal y fallback de Webhook/Token
                 channel = self.env['discuss.channel'].sudo().browse(record.res_id)
                 livechat_channel = channel.livechat_channel_id

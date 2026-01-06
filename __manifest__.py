@@ -1,6 +1,6 @@
 {
     'name': 'Elantar n8n Bridge',
-    'version': '18.0.1.1.4',
+    'version': '18.0.1.1.6',
     'category': 'Sales/Automation',
     'summary': 'Bridge between Odoo Live Chat and n8n AI specialists',
     'description': """
