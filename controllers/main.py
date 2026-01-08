@@ -127,12 +127,18 @@ class N8nBridgeController(http.Controller):
 
             # Publicar el mensaje con un usuario válido en el ambiente (evita ValueError en discuss)
             user_admin = request.env.ref('base.user_admin').sudo()
-            channel.with_user(user_admin).message_post(
+            msg = channel.with_user(user_admin).message_post(
                 body=body,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
                 author_id=bot_partner.id
             )
+
+            # Notificación proactiva al Bus (Odoo 18) para intentar forzar real-time
+            try:
+                channel._bus_send_store(msg)
+            except Exception as e:
+                _logger.debug("BRIDGE: Odoo Bus fallback triggered (non-critical): %s", e)
 
             return request.make_json_response({"status": "success"})
 
