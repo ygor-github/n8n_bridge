@@ -43,7 +43,7 @@ class N8nBridgeController(http.Controller):
         _logger.warning("BRIDGE: Intento de acceso no autorizado. Channel: %s, Token: %s", channel_id, token[:5] if token else "None")
         return False
 
-    @http.route('/n8n_bridge/update_state', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/n8n_bridge/update_state', type='json', auth='public', methods=['POST'], csrf=False)
     def update_bridge_state(self, **kwargs):
         if not self._check_token(**kwargs):
             return {"status": "error", "message": "Unauthorized"}
@@ -85,7 +85,7 @@ class N8nBridgeController(http.Controller):
             "context_data": json.loads(state.context_data) if state.context_data else {}
         }
 
-    @http.route('/n8n_bridge/chat_response', type='http', auth='none', methods=['POST'], csrf=False)
+    @http.route('/n8n_bridge/chat_response', type='http', auth='public', methods=['POST'], csrf=False)
     def chat_response(self, **kwargs):
         """
         Versión HTTP del endpoint para mayor control y evitar errores de despacho JSON-RPC.
@@ -146,7 +146,7 @@ class N8nBridgeController(http.Controller):
             _logger.exception("BRIDGE: Error processing chat_response")
             return request.make_json_response({"status": "error", "message": str(e)}, status=500)
 
-    @http.route('/n8n_bridge/create_resource', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/n8n_bridge/create_resource', type='json', auth='public', methods=['POST'], csrf=False)
     def create_resource(self, model, vals):
         """
         Endpoint genérico para crear recursos en Odoo (CRM Leads, Proyectos, Facturas).
@@ -166,7 +166,7 @@ class N8nBridgeController(http.Controller):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @http.route('/n8n_bridge/search_resource', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/n8n_bridge/search_resource', type='json', auth='public', methods=['POST'], csrf=False)
     def search_resource(self, model, domain, fields=None, limit=80, order='id desc'):
         """
         Endpoint genérico para buscar recursos en Odoo.
