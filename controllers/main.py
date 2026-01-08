@@ -127,7 +127,7 @@ class N8nBridgeController(http.Controller):
 
             # Publicar el mensaje con un usuario válido en el ambiente (evita ValueError en discuss)
             user_admin = request.env.ref('base.user_admin').sudo()
-            channel.with_user(user_admin).with_context(mail_create_nosummary=True).message_post(
+            channel.with_user(user_admin).message_post(
                 body=body,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
