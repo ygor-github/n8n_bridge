@@ -26,5 +26,21 @@ class LivechatChannel(models.Model):
         if bot_user:
             for record in self:
                 if bot_user in record.user_ids:
-                    # Añadir el bot a los operadores disponibles (forzar online)
+                    # Añadir el bot a los operadores disponibles (forzar online - display)
                     record.available_operator_ids = [(4, bot_user.id)]
+
+    def _get_available_users(self):
+        """
+        Método core usado por el controlador para saber si muestra el botón.
+        Si el bot es miembro, retornamos una lista que lo incluye, engañando
+        al sistema de presencia.
+        """
+        users = super()._get_available_users()
+        bot_user = self.env.ref('n8n_bridge.user_n8n_bot', raise_if_not_found=False)
+        
+        if bot_user:
+            for channel in self:
+                if bot_user in channel.user_ids:
+                    if bot_user not in users:
+                        users |= bot_user
+        return users

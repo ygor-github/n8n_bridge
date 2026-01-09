@@ -2,8 +2,8 @@
     <data noupdate="1">
         <!-- Partner para el Bot -->
         <record id="partner_n8n_bot" model="res.partner">
-            <field name="name">N8N Assistant</field>
-            <field name="display_name">N8N Assistant</field>
+            <field name="name">Virtual Assistant</field>
+            <field name="display_name">Virtual Assistant</field>
             <field name="company_id" ref="base.main_company"/>
             <field name="is_company">False</field>
             <field name="active">True</field>
@@ -13,7 +13,7 @@
 
         <!-- Usuario para el Bot -->
         <record id="user_n8n_bot" model="res.users">
-            <field name="name">N8N Assistant</field>
+            <field name="name">Virtual Assistant</field>
             <field name="login">n8n_bot</field>
             <field name="password">n8n_bot_password_change_me</field>
             <field name="partner_id" ref="partner_n8n_bot"/>
