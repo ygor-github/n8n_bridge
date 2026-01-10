@@ -177,7 +177,24 @@ class N8nBridgeController(http.Controller):
         """
         Endpoint genérico para buscar recursos en Odoo.
         """
-        if not self._check_token():
+        # Intentar deducir channel_id para autenticación granulada (Token de Canal)
+        channel_id = None
+        if model == 'mail.message' and isinstance(domain, list):
+            is_channel_model = False
+            res_id_val = None
+            for criterion in domain:
+                if isinstance(criterion, (list, tuple)) and len(criterion) == 3:
+                    field, operator, val = criterion
+                    if field == 'model' and operator == '=' and val == 'discuss.channel':
+                        is_channel_model = True
+                    if field == 'res_id' and operator == '=':
+                        res_id_val = val
+            
+            if is_channel_model and res_id_val:
+                channel_id = res_id_val
+
+        # Pasar channel_id deducido a _check_token
+        if not self._check_token(channel_id=channel_id):
             return {"status": "error", "message": "Unauthorized"}
 
         try:
