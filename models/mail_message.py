@@ -16,8 +16,9 @@ class MailMessage(models.Model):
         try:
             
             # Bot Partner para evitar bucles
-            bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
-            bot_partner_id = bot_partner.id if bot_partner else False
+            # Bot Partner default (fallback)
+            default_bot_partner = self.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+            default_bot_partner_id = default_bot_partner.id if default_bot_partner else False
             
             for record in self:
                 _logger.info("BRIDGE: Procesando mensaje ID %s, modelo: %s, res_id: %s", record.id, record.model, record.res_id)
@@ -26,18 +27,24 @@ class MailMessage(models.Model):
                     _logger.info("BRIDGE: Saltando mensaje %s (modelo %s no es discuss.channel)", record.id, record.model)
                     continue
 
-                # Evitar bucles
-                if bot_partner_id and record.author_id and record.author_id.id == bot_partner_id:
-                    _logger.info("BRIDGE: Ignorando mensaje %s (es del bot)", record.id)
+                # 1. Obtener Canal temprano para verificar configuración de bot
+                channel = self.env['discuss.channel'].sudo().browse(record.res_id)
+                livechat_channel = channel.livechat_channel_id
+
+                # Determinar quién es el bot para este canal
+                current_bot_partner_id = default_bot_partner_id
+                if livechat_channel and livechat_channel.n8n_bot_user_id:
+                    current_bot_partner_id = livechat_channel.n8n_bot_user_id.partner_id.id
+
+                # Evitar bucles (Check dinámico)
+                if current_bot_partner_id and record.author_id and record.author_id.id == current_bot_partner_id:
+                    _logger.info("BRIDGE: Ignorando mensaje %s (es del bot configurado)", record.id)
                     continue
 
                 if record.body and '<span class="n8n-bot">' in record.body:
                     _logger.info("BRIDGE: Ignorando mensaje %s (contiene firma de bot)", record.id)
                     continue
-
-                # 1. Obtener Canal y fallback de Webhook/Token
-                channel = self.env['discuss.channel'].sudo().browse(record.res_id)
-                livechat_channel = channel.livechat_channel_id
+                
                 
                 # Jerarquía de configuración: 
                 # A. Canal específico

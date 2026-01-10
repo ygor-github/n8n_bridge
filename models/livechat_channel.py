@@ -16,31 +16,40 @@ class LivechatChannel(models.Model):
         help="Token requerido para las peticiones que n8n envía a Odoo para este canal."
     )
 
+    n8n_bot_user_id = fields.Many2one(
+        'res.users', 
+        string='Usuario Bot n8n',
+        help="Selecciona el usuario interno que actuará como Bot para este canal. Debe ser miembro de los operadores."
+    )
+    n8n_persistent_online = fields.Boolean(
+        string='Forzar disponibilidad (Siempre online)',
+        default=True,
+        help="Si se activa, este usuario Bot aparecerá siempre conectado en el widget, permitiendo abrir el chat incluso si no hay humanos disponibles."
+    )
+
     def _compute_available_operator_ids(self):
         """
         Sobrescribe la disponibilidad de operadores para incluir al Bot de n8n
-        siempre que sea miembro del canal.
+        si está configurado y se fuerza su disponibilidad.
         """
         super()._compute_available_operator_ids()
-        bot_user = self.env.ref('n8n_bridge.user_n8n_bot', raise_if_not_found=False)
-        if bot_user:
-            for record in self:
-                if bot_user in record.user_ids:
-                    # Añadir el bot a los operadores disponibles (forzar online - display)
-                    record.available_operator_ids = [(4, bot_user.id)]
+        for record in self:
+            if record.n8n_bot_user_id and record.n8n_persistent_online:
+                # Verificar si el bot es un operador del canal
+                if record.n8n_bot_user_id in record.user_ids:
+                    # Añadir el bot a los operadores disponibles force
+                    record.available_operator_ids = [(4, record.n8n_bot_user_id.id)]
 
     def _get_available_users(self):
         """
-        Método core usado por el controlador para saber si muestra el botón.
-        Si el bot es miembro, retornamos una lista que lo incluye, engañando
-        al sistema de presencia.
+        Método usado por el controlador para determinar si el widget se muestra.
+        Asegura que el bot configurado esté en la lista de usuarios disponibles 
+        si tiene la persistencia activada.
         """
         users = super()._get_available_users()
-        bot_user = self.env.ref('n8n_bridge.user_n8n_bot', raise_if_not_found=False)
-        
-        if bot_user:
-            for channel in self:
-                if bot_user in channel.user_ids:
-                    if bot_user not in users:
-                        users |= bot_user
+        for channel in self:
+            if channel.n8n_bot_user_id and channel.n8n_persistent_online:
+                if channel.n8n_bot_user_id in channel.user_ids:
+                    if channel.n8n_bot_user_id not in users:
+                        users |= channel.n8n_bot_user_id
         return users

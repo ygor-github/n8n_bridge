@@ -9,6 +9,10 @@
                 <xpath expr="//notebook" position="inside">
                     <page string="Configuración n8n" name="n8n_config">
                         <group>
+                            <group string="Configuración del Bot">
+                                <field name="n8n_bot_user_id"/>
+                                <field name="n8n_persistent_online"/>
+                            </group>
                             <group string="Webhooks">
                                 <field name="n8n_webhook_url" placeholder="https://n8n.ejemplo.com/webhook/..."/>
                             </group>
