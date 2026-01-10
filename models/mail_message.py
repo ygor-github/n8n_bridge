@@ -136,6 +136,8 @@ class MailMessage(models.Model):
                     "message_id": record.id,
                     "active_specialist": active_specialist,
                     "context_data": context_data,
+                    "livechat_channel_id": livechat_channel.id if livechat_channel else False,
+                    "livechat_channel_name": livechat_channel.name if livechat_channel else "Unknown",
                 }
 
                 # Lanzar hilo para enviar el webhook
