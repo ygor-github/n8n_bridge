@@ -125,10 +125,16 @@ class N8nBridgeController(http.Controller):
             if not channel.exists():
                 return request.make_json_response({"status": "error", "message": "Canal no encontrado"}, status=404)
 
-            # Buscar el ID del partner del bot
-            bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+            # Buscar el ID del partner del bot (Dinámico por canal o Fallback)
+            bot_partner = False
+            if channel.livechat_channel_id and channel.livechat_channel_id.n8n_bot_user_id:
+                bot_partner = channel.livechat_channel_id.n8n_bot_user_id.partner_id
+            
             if not bot_partner:
-                _logger.error("BRIDGE: Partner n8n_bot not found")
+                bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+
+            if not bot_partner:
+                _logger.error("BRIDGE: Partner n8n_bot not found (Configured or Default)")
                 return request.make_json_response({"status": "error", "message": "Bot partner not found"}, status=500)
 
             # Publicar el mensaje con un usuario válido en el ambiente (evita ValueError en discuss)
