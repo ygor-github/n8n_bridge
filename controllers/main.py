@@ -72,7 +72,7 @@ class N8nBridgeController(http.Controller):
 
     @http.route('/n8n_bridge/get_state/<int:channel_id>', type='json', auth='none', methods=['GET'])
     def get_bridge_state(self, channel_id):
-        if not self._check_token():
+        if not self._check_token(channel_id=channel_id):
             return {"status": "error", "message": "Unauthorized"}
             
         state = request.env['n8n.bridge.state'].sudo().search([('channel_id', '=', channel_id)], limit=1)
@@ -198,6 +198,15 @@ class N8nBridgeController(http.Controller):
             
             if is_channel_model and res_id_val:
                 channel_id = res_id_val
+
+        # Support for n8n.bridge.state queries
+        if model == 'n8n.bridge.state' and isinstance(domain, list):
+            for criterion in domain:
+                if isinstance(criterion, (list, tuple)) and len(criterion) == 3:
+                    field, operator, val = criterion
+                    if field == 'channel_id' and operator == '=':
+                        channel_id = val
+                        break
 
         # Pasar channel_id deducido a _check_token
         if not self._check_token(channel_id=channel_id):
