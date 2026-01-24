@@ -1,0 +1,50 @@
+/* n8n Bridge - Quick Reply Buttons */
+
+.n8n-button-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    justify-content: flex-start;
+}
+
+.n8n-quick-reply {
+    background-color: #f0f4f8;
+    color: #2c3e50;
+    border: 1px solid #d1d9e0;
+    border-radius: 18px;
+    padding: 6px 14px;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    outline: none;
+    white-space: nowrap;
+}
+
+.n8n-quick-reply:hover {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.n8n-quick-reply:active {
+    transform: translateY(0);
+    background-color: #2980b9;
+}
+
+/* Soporte para modo oscuro si Odoo lo usa */
+[data-bs-theme="dark"] .n8n-quick-reply {
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    border-color: #34495e;
+}
+
+[data-bs-theme="dark"] .n8n-quick-reply:hover {
+    background-color: #3498db;
+    color: white;
+}

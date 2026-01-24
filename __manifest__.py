@@ -16,6 +16,12 @@
         'data/config_parameters.xml',
         'views/livechat_channel_views.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'n8n_bridge/static/src/css/n8n_buttons.css',
+            'n8n_bridge/static/src/js/n8n_buttons.js',
+        ],
+    },
     'installable': True,
     'application': True,
     'license': 'LGPL-3',
