@@ -1,8 +1,11 @@
 import json
 import logging
 import os
+import time
 from odoo import http
 from odoo.http import request
+from markupsafe import Markup
+from odoo.addons.mail.tools.discuss import Store
 
 _logger = logging.getLogger(__name__)
 
@@ -110,6 +113,7 @@ class N8nBridgeController(http.Controller):
 
             channel_id = params.get('channel_id')
             body = params.get('body')
+            simulate_typing = str(params.get('simulate_typing', '')).lower() in ('true', '1', 'yes')
 
             if not channel_id or not body:
                 _logger.warning("BRIDGE: Missing parameters. channel_id: %s, body: %s", channel_id, body)
@@ -119,43 +123,161 @@ class N8nBridgeController(http.Controller):
             if not request.db:
                 db_name = params.get('db') or os.environ.get('DATABASE') or 'restore251229'
                 _logger.info("BRIDGE: Manual DB binding triggered for: %s", db_name)
+                # Odoo core import here if needed, but 'odoo' should be available
+                import odoo
                 request.update_env(user=odoo.SUPERUSER_ID, context={'db': db_name})
             
-            channel = request.env['discuss.channel'].sudo().browse(int(channel_id))
-            if not channel.exists():
+            # Usar admin para contexto de sistema (Odoo 18 style)
+            admin_user = request.env.ref('base.user_admin').sudo()
+            env_admin = request.env(user=admin_user)
+            
+            channel = env_admin['discuss.channel'].browse(int(channel_id)).exists()
+            if not channel:
                 return request.make_json_response({"status": "error", "message": "Canal no encontrado"}, status=404)
 
-            # Buscar el ID del partner del bot (Dinámico por canal o Fallback)
+            # Buscar el ID del partner del bot
             bot_partner = False
             if channel.livechat_channel_id and channel.livechat_channel_id.n8n_bot_user_id:
                 bot_partner = channel.livechat_channel_id.n8n_bot_user_id.partner_id
             
             if not bot_partner:
-                bot_partner = request.env.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
+                bot_partner_id = env_admin['ir.config_parameter'].get_param('n8n_bridge.bot_partner_id')
+                if bot_partner_id:
+                    bot_partner = env_admin['res.partner'].browse(int(bot_partner_id)).exists()
+            
+            if not bot_partner:
+                bot_partner = env_admin.ref('n8n_bridge.partner_n8n_bot', raise_if_not_found=False)
 
             if not bot_partner:
-                _logger.error("BRIDGE: Partner n8n_bot not found (Configured or Default)")
-                return request.make_json_response({"status": "error", "message": "Bot partner not found"}, status=500)
+                bot_partner = admin_user.partner_id
 
-            # Publicar el mensaje con un usuario válido en el ambiente (evita ValueError en discuss)
-            user_admin = request.env.ref('base.user_admin').sudo()
-            msg = channel.with_user(user_admin).message_post(
-                body=body,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-                author_id=bot_partner.id
-            )
+            # Simulación de escritura (Opcional)
+            if simulate_typing:
+                member = env_admin['discuss.channel.member'].search([
+                    ('channel_id', '=', channel.id),
+                    ('partner_id', '=', bot_partner.id)
+                ], limit=1)
+                
+                if not member:
+                    channel.add_members(partner_ids=[bot_partner.id])
+                    member = env_admin['discuss.channel.member'].search([
+                        ('channel_id', '=', channel.id),
+                        ('partner_id', '=', bot_partner.id)
+                    ], limit=1)
 
-            # Notificación proactiva al Bus (Odoo 18) para intentar forzar real-time
-            try:
-                channel._bus_send_store(msg)
-            except Exception as e:
-                _logger.debug("BRIDGE: Odoo Bus fallback triggered (non-critical): %s", e)
+                if member:
+                    _logger.info("BRIDGE: Simulating human typing for bot '%s' in channel %s", bot_partner.name, channel.id)
+                    
+                    # 1. Empieza a escribir
+                    member._notify_typing(True)
+                    env_admin.cr.commit() # Forzar envío al Bus/Websocket
+                    time.sleep(1.5)
+                    
+                    # 2. Pausa breve (opcional, para realismo)
+                    member._notify_typing(False)
+                    env_admin.cr.commit()
+                    time.sleep(0.5)
+                    
+                    # 3. Vuelve a escribir
+                    member._notify_typing(True)
+                    env_admin.cr.commit()
+                    time.sleep(1.2)
+                    # No hace falta notify(False) explícito, el mensaje lo quitará
+
+            # Asegurar que el body no traiga saltos de línea literales escapados (\n)
+            if isinstance(body, str):
+                body = body.replace('\\n', '\n')
+
+            # Registrar el mensaje directamente para bypass del sanitizer
+            msg_vals = {
+                'body': Markup(body),
+                'model': 'discuss.channel',
+                'res_id': channel.id,
+                'message_type': 'comment',
+                'subtype_id': env_admin.ref('mail.mt_comment').id,
+                'author_id': bot_partner.id,
+            }
+            msg = env_admin['mail.message'].create(msg_vals)
+            env_admin.cr.commit() # Asegurar que el mensaje se guarda
+
+            # Notificación Real-time para Odoo 18
+            channel._bus_send('discuss.channel/new_message', {
+                'id': channel.id,
+                'data': Store(msg).get_result(),
+            })
+
+            # Limpiar presencia explícitamente después del mensaje
+            if simulate_typing and member:
+                member._notify_typing(False)
+                env_admin.cr.commit()
 
             return request.make_json_response({"status": "success"})
 
         except Exception as e:
             _logger.exception("BRIDGE: Error processing chat_response")
+            return request.make_json_response({"status": "error", "message": str(e)}, status=500)
+
+    @http.route('/n8n_bridge/set_typing', type='http', auth='none', methods=['POST'], csrf=False)
+    def set_typing(self, channel_id=None, status=None, **kwargs):
+        """
+        Permite a n8n marcar presencia (typing) en un canal.
+        """
+        if not self._check_token():
+            return request.make_json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+        try:
+            # Obtener parámetros
+            c_id = channel_id or request.params.get('channel_id')
+            s_val = status or request.params.get('status')
+
+            if not c_id:
+                return request.make_json_response({"status": "error", "message": "Missing channel_id"}, status=400)
+
+            channel_id = int(c_id)
+            is_typing = str(s_val).lower() in ('true', '1', 'yes')
+
+            _logger.info("BRIDGE: set_typing - channel: %s, status: %s", channel_id, is_typing)
+
+            # Usamos el admin para todo el contexto
+            admin_user = request.env.ref('base.user_admin').sudo()
+            env_admin = request.env(user=admin_user)
+
+            channel = env_admin['discuss.channel'].browse(channel_id).exists()
+            if not channel:
+                return request.make_json_response({"status": "error", "message": "Channel not found"}, status=404)
+
+            # Buscar el partner del bot
+            bot_partner_id = env_admin['ir.config_parameter'].get_param('n8n_bridge.bot_partner_id')
+            if bot_partner_id:
+                bot_partner = env_admin['res.partner'].browse(int(bot_partner_id)).exists()
+            else:
+                bot_partner = admin_user.partner_id
+
+            if not bot_partner:
+                return request.make_json_response({"status": "error", "message": "Bot partner not found"}, status=500)
+
+            # Buscar miembro del canal
+            member = env_admin['discuss.channel.member'].search([
+                ('channel_id', '=', channel.id),
+                ('partner_id', '=', bot_partner.id)
+            ], limit=1)
+
+            if not member:
+                _logger.info("BRIDGE: Bot no es miembro del canal %s, intentando unirlo.", channel.id)
+                channel.add_members(partner_ids=[bot_partner.id])
+                member = env_admin['discuss.channel.member'].search([
+                    ('channel_id', '=', channel.id),
+                    ('partner_id', '=', bot_partner.id)
+                ], limit=1)
+
+            if member:
+                member._notify_typing(is_typing)
+                return request.make_json_response({"status": "success", "is_typing": is_typing})
+            else:
+                return request.make_json_response({"status": "error", "message": "Bot is not a member of this channel"}, status=404)
+
+        except Exception as e:
+            _logger.exception("BRIDGE: Error in set_typing")
             return request.make_json_response({"status": "error", "message": str(e)}, status=500)
 
     @http.route('/n8n_bridge/create_resource', type='json', auth='none', methods=['POST'], csrf=False)

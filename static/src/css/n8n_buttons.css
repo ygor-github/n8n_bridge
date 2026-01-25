@@ -10,8 +10,10 @@
 }
 
 .n8n-quick-reply {
+    display: inline-block;
+    text-decoration: none !important;
     background-color: #f0f4f8;
-    color: #2c3e50;
+    color: #2c3e50 !important;
     border: 1px solid #d1d9e0;
     border-radius: 18px;
     padding: 6px 14px;
@@ -19,7 +21,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     outline: none;
     white-space: nowrap;
 }
@@ -29,7 +31,7 @@
     color: white;
     border-color: #2980b9;
     transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .n8n-quick-reply:active {
