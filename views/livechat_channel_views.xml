@@ -6,12 +6,17 @@
             <field name="model">im_livechat.channel</field>
             <field name="inherit_id" ref="im_livechat.im_livechat_channel_view_form"/>
             <field name="arch" type="xml">
+                <xpath expr="//field[@name='default_message']" position="attributes">
+                    <attribute name="widget">html</attribute>
+                    <attribute name="options">{'style-inline': true}</attribute>
+                </xpath>
                 <xpath expr="//notebook" position="inside">
                     <page string="Configuración n8n" name="n8n_config">
                         <group>
                             <group string="Configuración del Bot">
                                 <field name="n8n_bot_user_id"/>
                                 <field name="n8n_persistent_online"/>
+                                <field name="n8n_enable_html_welcome"/>
                             </group>
                             <group string="Webhooks">
                                 <field name="n8n_webhook_url" placeholder="https://n8n.ejemplo.com/webhook/..."/>

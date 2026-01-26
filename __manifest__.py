@@ -1,6 +1,6 @@
 {
     'name': 'Elantar n8n Bridge',
-    'version': '18.0.1.2.3',
+    'version': '18.0.1.20.0',
     'category': 'Sales/Automation',
     'summary': 'Bridge between Odoo Live Chat and n8n AI specialists',
     'description': """
@@ -20,14 +20,17 @@
         'web.assets_frontend': [
             'n8n_bridge/static/src/css/n8n_buttons.css',
             'n8n_bridge/static/src/js/n8n_buttons.js',
+            'n8n_bridge/static/src/js/thread_model_patch.js',
         ],
         'im_livechat.assets_embed_external': [
             'n8n_bridge/static/src/css/n8n_buttons.css',
             'n8n_bridge/static/src/js/n8n_buttons.js',
+            'n8n_bridge/static/src/js/thread_model_patch.js',
         ],
         'im_livechat.assets_embed_core': [
             'n8n_bridge/static/src/css/n8n_buttons.css',
             'n8n_bridge/static/src/js/n8n_buttons.js',
+            'n8n_bridge/static/src/js/thread_model_patch.js',
         ],
     },
     'installable': True,

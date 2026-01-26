@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    console.log("BRIDGE: n8n_buttons.js (v5 - Input Blocking) cargado.");
+    console.log("BRIDGE: n8n_buttons.js (v16 - Global Resolver) cargado.");
 
     // Función para cerrar el widget de chat
     function closeChat() {
@@ -94,12 +94,11 @@
 
         // Si es un enlace externo (http/https)
         if (href.startsWith('http')) {
-            // Si tiene el atributo data-close-chat, cerrar el widget después de abrir el enlace
-            if (btn.getAttribute('data-close-chat') === 'true') {
-                setTimeout(() => {
-                    closeChat();
-                }, 500); // Pequeño delay para que el enlace se abra primero
-            }
+            console.log("BRIDGE: Enlace externo detectado. Iniciando cierre de chat...");
+            // Cerrar el chat para cualquier enlace externo según requerimiento
+            setTimeout(() => {
+                closeChat();
+            }, 600);
             return;
         }
 
@@ -170,10 +169,31 @@
             }, 50);
 
             const container = btn.closest('.n8n-button-container');
-            if (container) {
-                container.style.opacity = '0.5';
-                container.style.pointerEvents = 'none';
+            const isWelcomeBtn = btn.classList.contains('n8n-welcome-btn') ||
+                btn.closest('.n8n-welcome-wrapper');
+
+            if (isWelcomeBtn) {
+                console.log("BRIDGE: Resolviendo MENSAJE DE BIENVENIDA (v15).");
+                window._n8n_welcome_resolved = true;
+                // Marcar todos los n8n-welcome-btn visibles como resueltos
+                findAllInShadows('.n8n-welcome-btn').forEach(b => b.classList.add('n8n-resolved'));
             }
+
+            if (container) {
+                console.log("BRIDGE: Marcando contenedor como RESUELTO.");
+                container.classList.add('n8n-buttons-resolved');
+            } else {
+                btn.classList.add('n8n-resolved');
+                const parent = btn.parentElement;
+                if (parent) {
+                    parent.querySelectorAll('.n8n-quick-reply').forEach(b => b.classList.add('n8n-resolved'));
+                }
+            }
+
+            // Forzar actualización inmediata y retardada de la UI para capturar re-renderizados de Odoo
+            setTimeout(checkForActiveButtons, 50);
+            setTimeout(checkForActiveButtons, 500);
+            setTimeout(checkForActiveButtons, 1500);
         } else {
             console.error("BRIDGE: No se encontró .o-mail-Composer-input para enviar la respuesta.");
         }
@@ -194,127 +214,181 @@
 
     // ========== BLOQUEO DE INPUT DURANTE RESPUESTAS RÁPIDAS ==========
 
-    // Función para buscar el compositor en Shadow DOM
-    function findComposer() {
-        function findInShadow(root, selector) {
-            let el = root.querySelector(selector);
-            if (el) return el;
-            const allElements = root.querySelectorAll('*');
-            for (let i = 0; i < allElements.length; i++) {
-                const child = allElements[i];
-                if (child.shadowRoot) {
-                    const found = findInShadow(child.shadowRoot, selector);
-                    if (found) return found;
-                }
-            }
-            return null;
-        }
+    // --- UTILS PARA SHADOW DOM ---
 
-        const selectors = ['.o-mail-Composer-input', '.o_composer_text_field', 'textarea[placeholder*="mensaje"]'];
+    function findAllInShadows(selector, root = document) {
+        let found = Array.from(root.querySelectorAll(selector));
+        const all = root.querySelectorAll('*');
+        for (const el of all) {
+            if (el.shadowRoot) {
+                found = found.concat(findAllInShadows(selector, el.shadowRoot));
+            }
+        }
+        return found;
+    }
+
+    function findFirstInShadows(selector, root = document) {
+        const el = root.querySelector(selector);
+        if (el) return el;
+
+        const all = root.querySelectorAll('*');
+        for (const child of all) {
+            if (child.shadowRoot) {
+                const found = findFirstInShadows(selector, child.shadowRoot);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    // Identificar el compositor (Odoo 18+)
+    function findComposer() {
+        const selectors = [
+            '.o-mail-Composer-input',
+            '.o-mail-Composer [contenteditable="true"]',
+            '.o_composer_text_field',
+            '.o_chat_composer_input',
+            'textarea[placeholder*="mensaje"]',
+            'textarea'
+        ];
+
         for (const selector of selectors) {
-            const composer = findInShadow(document, selector);
-            if (composer && composer.offsetParent !== null) {
+            const composer = findFirstInShadows(selector);
+            if (composer && composer.isConnected) {
                 return composer;
             }
         }
         return null;
     }
 
-    // Función para bloquear/desbloquear el compositor
     function toggleComposerBlock(shouldBlock) {
         const composer = findComposer();
-        if (!composer) return;
+        if (!composer) {
+            // Solo loguear si estamos intentando bloquear y no lo encontramos
+            if (shouldBlock) console.warn("BRIDGE: Intento de bloqueo fallido - No se encontró el compositor.");
+            return;
+        }
 
-        if (shouldBlock) {
-            composer.disabled = true;
-            composer.placeholder = "Por favor, selecciona una opción arriba ☝️";
-            composer.style.backgroundColor = '#f5f5f5';
-            composer.style.cursor = 'not-allowed';
-            console.log("BRIDGE: Compositor bloqueado - esperando selección de botón");
-        } else {
-            composer.disabled = false;
-            composer.placeholder = "Escribe un mensaje...";
-            composer.style.backgroundColor = '';
-            composer.style.cursor = '';
-            console.log("BRIDGE: Compositor desbloqueado");
+        if (!composer.getAttribute('data-original-placeholder')) {
+            const original = composer.placeholder || composer.getAttribute('placeholder') || "Escribe un mensaje...";
+            composer.setAttribute('data-original-placeholder', original);
+        }
+
+        const isCurrentlyBlocked = composer.classList.contains('n8n-composer-blocked');
+
+        if (shouldBlock && !isCurrentlyBlocked) {
+            if (composer.tagName === 'TEXTAREA' || composer.tagName === 'INPUT') {
+                composer.disabled = true;
+            } else {
+                composer.setAttribute('contenteditable', 'false');
+            }
+            composer.classList.add('n8n-composer-blocked');
+            const msg = "Selecciona una opción arriba 👆";
+            composer.placeholder = msg;
+            composer.setAttribute('placeholder', msg);
+            console.log("BRIDGE: >>> BLOQUEANDO COMPOSITOR <<<");
+        } else if (!shouldBlock && isCurrentlyBlocked) {
+            if (composer.tagName === 'TEXTAREA' || composer.tagName === 'INPUT') {
+                composer.disabled = false;
+            } else {
+                composer.setAttribute('contenteditable', 'true');
+            }
+            composer.classList.remove('n8n-composer-blocked');
+            const original = composer.getAttribute('data-original-placeholder');
+            composer.placeholder = original;
+            composer.setAttribute('placeholder', original);
+            console.log("BRIDGE: >>> DESBLOQUEANDO COMPOSITOR <<<");
         }
     }
 
-    // Función para verificar si hay botones activos
     function checkForActiveButtons() {
-        // Buscar contenedores de botones en el DOM
-        function findInShadow(root, selector) {
-            const elements = root.querySelectorAll(selector);
-            if (elements.length > 0) return Array.from(elements);
+        const allButtons = findAllInShadows('.n8n-quick-reply');
 
-            const allElements = root.querySelectorAll('*');
-            let found = [];
-            for (let i = 0; i < allElements.length; i++) {
-                const child = allElements[i];
-                if (child.shadowRoot) {
-                    found = found.concat(findInShadow(child.shadowRoot, selector));
-                }
-            }
-            return found;
+        // Diagnóstico si encontramos botones pero no se bloquea
+        if (allButtons.length > 0) {
+            console.log("BRIDGE (Diag): Botones encontrados en el DOM: " + allButtons.length);
         }
 
-        const containers = findInShadow(document, '.n8n-button-container');
+        const activeButtons = allButtons.filter(btn => {
+            // --- Lógica Global de Bienvenida ---
+            // Si el flag global está activo, cualquier botón de bienvenida está resuelto
+            const isWelcomeBtn = btn.classList.contains('n8n-welcome-btn') ||
+                btn.closest('.n8n-welcome-wrapper');
 
-        // Filtrar solo contenedores visibles y no deshabilitados
-        const activeContainers = containers.filter(container => {
-            if (container.offsetParent === null ||
-                container.style.pointerEvents === 'none' ||
-                container.style.opacity === '0.5') {
+            if (window._n8n_welcome_resolved && isWelcomeBtn) {
+                // Forzar clase resolved por si Odoo re-renderizó
+                if (!btn.classList.contains('n8n-resolved')) {
+                    btn.classList.add('n8n-resolved');
+                }
                 return false;
             }
 
-            // IMPORTANTE: Solo bloquear si tiene botones de respuesta rápida (no enlaces externos)
-            const buttons = container.querySelectorAll('.n8n-quick-reply');
-            let hasQuickReplyButtons = false;
+            // 1. Si el botón mismo está resuelto
+            if (btn.classList.contains('n8n-resolved')) return false;
 
-            for (const btn of buttons) {
-                const href = btn.getAttribute('href') || '';
-                const hasDataReply = btn.hasAttribute('data-reply');
-
-                // Es un botón de respuesta rápida si:
-                // 1. Tiene data-reply, O
-                // 2. No es un enlace externo (no empieza con http)
-                if (hasDataReply || !href.startsWith('http')) {
-                    hasQuickReplyButtons = true;
-                    break;
-                }
+            // 2. Si el contenedor está marcado como resuelto
+            const container = btn.closest('.n8n-button-container');
+            if (container && container.classList.contains('n8n-buttons-resolved')) {
+                return false;
             }
 
-            return hasQuickReplyButtons;
+            const target = container || btn;
+            const style = window.getComputedStyle(target);
+
+            const isVisible = target.isConnected &&
+                style.display !== 'none' &&
+                style.opacity !== '0.5' &&
+                style.pointerEvents !== 'none' &&
+                style.filter.indexOf('grayscale') === -1;
+            return isVisible;
         });
 
-        const hasActiveButtons = activeContainers.length > 0;
-        toggleComposerBlock(hasActiveButtons);
+        if (activeButtons.length > 0) {
+            console.log("BRIDGE (Diag): Botones ACTIVOS tras filtro: " + activeButtons.length);
+        }
 
-        return hasActiveButtons;
+        toggleComposerBlock(activeButtons.length > 0);
     }
 
-    // Observador de mutaciones para detectar nuevos mensajes con botones
-    const observer = new MutationObserver((mutations) => {
-        // Debounce: esperar un poco antes de verificar
-        clearTimeout(window.buttonCheckTimeout);
-        window.buttonCheckTimeout = setTimeout(() => {
-            checkForActiveButtons();
-        }, 100);
-    });
+    // --- SETUP ---
 
-    // Iniciar observación del DOM
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class']
-    });
+    const observedRoots = new Set();
+    function attachObserver(root) {
+        if (!root || observedRoots.has(root)) return;
+        observedRoots.add(root);
+        console.log("BRIDGE: Observando nuevo Shadow Root/Elemento...");
 
-    // Verificación inicial
-    setTimeout(() => {
+        const observer = new MutationObserver(() => {
+            clearTimeout(window._n8n_check_timer);
+            window._n8n_check_timer = setTimeout(checkForActiveButtons, 500);
+        });
+
+        observer.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+
+        // Recursión para Shadow Roots hijos
+        const children = root.querySelectorAll('*');
+        for (const child of children) {
+            if (child.shadowRoot) attachObserver(child.shadowRoot);
+        }
+    }
+
+    // Monitoreo constante
+    attachObserver(document.body);
+    setInterval(() => {
+        // Buscar proactivamente el root de livechat
+        const lr = document.querySelector('.o-livechat-root');
+        if (lr && lr.shadowRoot) attachObserver(lr.shadowRoot);
+
+        // Ejecutar chequeo preventivo
         checkForActiveButtons();
-    }, 1000);
+    }, 2000);
 
-    console.log("BRIDGE: Sistema de bloqueo de input activado");
+    setTimeout(checkForActiveButtons, 3000);
+
+    console.log("BRIDGE: Sistema de bloqueo (v16 - Global Resolver) inicializado.");
 })();

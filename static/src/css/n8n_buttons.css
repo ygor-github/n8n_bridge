@@ -50,3 +50,37 @@
     background-color: #3498db;
     color: white;
 }
+
+/* Estado bloqueado del compositor */
+.n8n-composer-blocked {
+    background-color: #f8f9fa !important;
+    cursor: not-allowed !important;
+    color: #495057 !important;
+    opacity: 1 !important;
+}
+
+.n8n-composer-blocked::placeholder {
+    color: #495057 !important;
+    opacity: 1 !important;
+    font-weight: 500;
+}
+
+/* Para Odoo 18 / contenteditable */
+.n8n-composer-blocked[contenteditable="false"] {
+    color: #495057 !important;
+    -webkit-text-fill-color: #495057 !important;
+}
+/* Botones ya seleccionados o proceso resuelto */
+.n8n-buttons-resolved,
+.n8n-quick-reply.n8n-resolved {
+    opacity: 0.5 !important;
+    pointer-events: none !important;
+    filter: grayscale(80%);
+    cursor: default !important;
+}
+
+.n8n-buttons-resolved .n8n-quick-reply {
+    cursor: default !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
